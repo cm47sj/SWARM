@@ -1,0 +1,3359 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SWARM</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #070a10;
+      --panel: rgba(12, 18, 28, 0.72);
+      --line: rgba(151, 255, 224, 0.17);
+      --mint: #9dffe3;
+      --mint-strong: #e3fff7;
+      --gold: #ffd85a;
+      --danger: #ff4d68;
+      --muted: #778698;
+    }
+
+    * { box-sizing: border-box; }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: var(--bg);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: white;
+      user-select: none;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 50% 45%, rgba(39, 71, 77, 0.08), transparent 48%),
+        linear-gradient(rgba(255,255,255,0.012) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.012) 1px, transparent 1px);
+      background-size: auto, 44px 44px, 44px 44px;
+      mask-image: radial-gradient(circle at center, black 20%, transparent 95%);
+    }
+
+    canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      cursor: none;
+      touch-action: none;
+    }
+
+    .hud {
+      position: fixed;
+      z-index: 3;
+      top: 20px;
+      left: 50%;
+      width: min(1040px, calc(100% - 40px));
+      transform: translateX(-50%);
+      pointer-events: none;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(100px, 1fr));
+      gap: 1px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 10px 10px 0 0;
+      background: var(--line);
+      box-shadow: 0 12px 38px rgba(0,0,0,0.2);
+    }
+
+    .stat {
+      min-height: 56px;
+      padding: 10px 14px 8px;
+      background: var(--panel);
+      backdrop-filter: blur(10px);
+    }
+
+    .label {
+      display: block;
+      margin-bottom: 2px;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .value {
+      display: block;
+      color: #eefbf8;
+      font-size: 20px;
+      font-weight: 750;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #multiplierValue { color: var(--gold); }
+    #ascensionValue { color: #d6a5ff; }
+
+    .growth-shell {
+      position: relative;
+      height: 8px;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-top: 0;
+      border-radius: 0 0 10px 10px;
+      background: rgba(10, 15, 24, 0.8);
+    }
+
+    #growthBar {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #4fe5c3, #c9fff0);
+      box-shadow: 0 0 15px rgba(104, 255, 217, 0.7);
+      transition: width 100ms linear;
+    }
+
+    #growthText {
+      position: absolute;
+      top: 11px;
+      right: 4px;
+      color: rgba(174, 198, 202, 0.62);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    #mutationStrip {
+      display: flex;
+      flex-wrap: wrap;
+      min-height: 24px;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      padding-top: 7px;
+      color: rgba(154, 175, 187, 0.52);
+      font-size: 8px;
+      font-weight: 850;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+    }
+
+    .mutation-chip {
+      padding: 4px 7px;
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 999px;
+      background: rgba(7, 11, 18, 0.7);
+      white-space: nowrap;
+    }
+
+    .mutation-chip.control { color: #75ddff; border-color: rgba(82, 202, 255, 0.24); }
+    .mutation-chip.growth { color: #8dff72; border-color: rgba(115, 255, 91, 0.24); }
+    .mutation-chip.greed { color: #e0a0ff; border-color: rgba(203, 111, 255, 0.26); }
+
+    .score-rule {
+      position: fixed;
+      z-index: 4;
+      right: 28px;
+      bottom: 28px;
+      max-width: 230px;
+      padding: 11px 14px;
+      border: 1px solid rgba(191, 124, 255, 0.28);
+      border-radius: 8px;
+      background: rgba(14, 8, 24, 0.66);
+      color: rgba(218, 194, 239, 0.7);
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 1.55;
+      letter-spacing: 0.1em;
+      text-align: right;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    .score-rule strong { color: #dfb7ff; }
+
+    .control-hint {
+      position: fixed;
+      z-index: 3;
+      bottom: 28px;
+      left: 28px;
+      color: rgba(155, 179, 185, 0.42);
+      font-size: 9px;
+      font-weight: 800;
+      letter-spacing: 0.15em;
+      line-height: 1.8;
+      text-transform: uppercase;
+      pointer-events: none;
+    }
+
+    #intro {
+      position: fixed;
+      z-index: 5;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: white;
+      text-align: center;
+      text-shadow: 0 0 24px rgba(143, 255, 224, 0.28);
+      pointer-events: none;
+      transition: opacity 800ms ease, transform 800ms ease;
+    }
+
+    #intro.hidden {
+      opacity: 0;
+      transform: translate(-50%, -54%);
+    }
+
+    #intro .eyebrow {
+      margin-bottom: 13px;
+      color: var(--mint);
+      font-size: 10px;
+      font-weight: 850;
+      letter-spacing: 0.35em;
+    }
+
+    #intro .line {
+      font-size: clamp(20px, 2.2vw, 32px);
+      font-weight: 850;
+      letter-spacing: 0.06em;
+      line-height: 1.25;
+    }
+
+    #intro .move {
+      margin-top: 18px;
+      color: rgba(201, 224, 223, 0.68);
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: 0.18em;
+    }
+
+    #toast {
+      position: fixed;
+      z-index: 6;
+      top: 115px;
+      left: 50%;
+      padding: 9px 14px;
+      border: 1px solid rgba(160, 255, 227, 0.25);
+      border-radius: 999px;
+      background: rgba(9, 18, 24, 0.84);
+      color: var(--mint);
+      font-size: 10px;
+      font-weight: 850;
+      letter-spacing: 0.14em;
+      opacity: 0;
+      transform: translate(-50%, -8px);
+      pointer-events: none;
+      transition: opacity 170ms ease, transform 170ms ease;
+    }
+
+    #toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    #debugPanel {
+      position: fixed;
+      z-index: 7;
+      top: 104px;
+      left: 24px;
+      display: none;
+      min-width: 205px;
+      padding: 12px 14px;
+      border: 1px solid rgba(130, 255, 216, 0.22);
+      border-radius: 8px;
+      background: rgba(4, 9, 13, 0.85);
+      color: #9fffe2;
+      font: 11px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      white-space: pre;
+      pointer-events: none;
+    }
+
+    #debugPanel.visible { display: block; }
+
+    #gameOver {
+      position: fixed;
+      z-index: 10;
+      inset: 0;
+      display: none;
+      place-items: center;
+      background: rgba(4, 6, 10, 0.72);
+      backdrop-filter: blur(7px);
+    }
+
+    #gameOver.visible { display: grid; }
+
+    #mutationDraft {
+      position: fixed;
+      z-index: 9;
+      inset: 0;
+      display: none;
+      place-items: center;
+      padding: 24px;
+      background: rgba(3, 6, 12, 0.67);
+      backdrop-filter: blur(6px);
+    }
+
+    #mutationDraft.visible { display: grid; }
+
+    .mutation-card {
+      width: min(900px, calc(100vw - 40px));
+      padding: 28px;
+      border: 1px solid rgba(200, 143, 255, 0.28);
+      border-radius: 16px;
+      background: linear-gradient(155deg, rgba(20, 18, 34, 0.97), rgba(7, 12, 19, 0.97));
+      box-shadow: 0 28px 100px rgba(0,0,0,0.56);
+      text-align: center;
+    }
+
+    .mutation-eyebrow {
+      color: #d6a5ff;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+    }
+
+    .mutation-card h2 {
+      margin: 7px 0 5px;
+      font-size: clamp(22px, 3vw, 34px);
+      letter-spacing: 0.04em;
+    }
+
+    #mutationReason {
+      margin: 0 0 22px;
+      color: rgba(204, 212, 226, 0.58);
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    #mutationChoices {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .mutation-choice {
+      position: relative;
+      min-height: 190px;
+      padding: 22px 18px 18px;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.025);
+      color: white;
+      font: inherit;
+      text-align: left;
+      cursor: pointer;
+      transition: transform 120ms ease, background 120ms ease, border-color 120ms ease;
+    }
+
+    .mutation-choice:hover,
+    .mutation-choice:focus-visible {
+      outline: none;
+      transform: translateY(-3px);
+      background: rgba(255,255,255,0.06);
+    }
+
+    .mutation-choice.control { border-color: rgba(74, 198, 255, 0.34); }
+    .mutation-choice.growth { border-color: rgba(113, 255, 85, 0.32); }
+    .mutation-choice.greed { border-color: rgba(206, 104, 255, 0.36); }
+    .mutation-choice.control:hover { background: rgba(52, 169, 221, 0.1); }
+    .mutation-choice.growth:hover { background: rgba(89, 201, 66, 0.1); }
+    .mutation-choice.greed:hover { background: rgba(170, 75, 220, 0.11); }
+
+    .mutation-number {
+      position: absolute;
+      top: 12px;
+      right: 13px;
+      color: rgba(255,255,255,0.3);
+      font-size: 10px;
+      font-weight: 900;
+    }
+
+    .mutation-type {
+      display: block;
+      margin-bottom: 27px;
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+    }
+
+    .mutation-choice.control .mutation-type { color: #72d9ff; }
+    .mutation-choice.growth .mutation-type { color: #8cff70; }
+    .mutation-choice.greed .mutation-type { color: #e0a1ff; }
+
+    .mutation-name {
+      display: block;
+      margin-bottom: 10px;
+      font-size: 18px;
+      font-weight: 900;
+      letter-spacing: 0.035em;
+    }
+
+    .mutation-description {
+      display: block;
+      color: rgba(220, 229, 236, 0.68);
+      font-size: 11px;
+      font-weight: 650;
+      line-height: 1.55;
+    }
+
+    .mutation-cost {
+      display: block;
+      margin-top: 12px;
+      color: rgba(255, 186, 199, 0.72);
+      font-size: 9px;
+      font-weight: 800;
+      line-height: 1.45;
+      text-transform: uppercase;
+    }
+
+    .mutation-hint {
+      margin: 17px 0 0;
+      color: rgba(164, 176, 192, 0.44);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .game-over-card {
+      width: min(460px, calc(100% - 40px));
+      padding: 36px 42px 34px;
+      border: 1px solid rgba(255, 93, 112, 0.3);
+      border-radius: 16px;
+      background: linear-gradient(160deg, rgba(22, 19, 28, 0.96), rgba(8, 12, 18, 0.96));
+      box-shadow: 0 24px 90px rgba(0,0,0,0.5), 0 0 80px rgba(255, 46, 79, 0.05) inset;
+      text-align: center;
+    }
+
+    .game-over-card h1 {
+      margin: 0 0 8px;
+      color: #ff7184;
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+    }
+
+    .game-over-card.victory {
+      border-color: rgba(143, 255, 225, 0.42);
+      box-shadow: 0 24px 90px rgba(0,0,0,0.5), 0 0 90px rgba(87, 255, 209, 0.07) inset;
+    }
+
+    .game-over-card.victory h1 { color: #a7ffe7; }
+    #resultGrade { color: #ffd96b; font-size: 18px; }
+
+    .lost-note {
+      margin-bottom: 26px;
+      color: rgba(205, 176, 184, 0.62);
+      font-size: 10px;
+      font-weight: 750;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+    }
+
+    .results {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px 24px;
+      margin: 0 0 28px;
+      padding: 20px 0;
+      border-top: 1px solid rgba(255,255,255,0.08);
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      color: #9aa7b4;
+      font-size: 11px;
+      font-weight: 750;
+      letter-spacing: 0.08em;
+      text-align: left;
+      text-transform: uppercase;
+    }
+
+    .results strong {
+      color: white;
+      font-size: 14px;
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
+    #restartButton {
+      width: 100%;
+      min-height: 58px;
+      border: 1px solid rgba(166, 255, 228, 0.62);
+      border-radius: 9px;
+      background: rgba(103, 255, 211, 0.1);
+      color: #c8fff0;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: 0.18em;
+      cursor: pointer;
+    }
+
+    #restartButton:hover { background: rgba(103, 255, 211, 0.18); }
+
+    .restart-hint {
+      margin: 12px 0 0;
+      color: rgba(160, 174, 184, 0.48);
+      font-size: 9px;
+      font-weight: 750;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+    }
+
+    @media (max-width: 760px) {
+      .hud { width: calc(100% - 24px); top: 12px; }
+      .stats { grid-template-columns: repeat(3, 1fr); }
+      .stat { min-height: 48px; padding: 9px 7px 7px; }
+      .value { font-size: 16px; }
+      .label { font-size: 7px; letter-spacing: 0.08em; }
+      .score-rule { right: 14px; bottom: 14px; }
+      .control-hint { left: 14px; bottom: 14px; }
+      #mutationChoices { grid-template-columns: 1fr; }
+      .mutation-card { max-height: calc(100vh - 32px); overflow: auto; padding: 20px; }
+      .mutation-choice { min-height: 135px; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gameCanvas" aria-label="SWARM game field"></canvas>
+
+  <header class="hud" aria-label="Game statistics">
+    <div class="stats">
+      <div class="stat"><span class="label">Population</span><span class="value" id="populationValue">1</span></div>
+      <div class="stat"><span class="label">Score</span><span class="value" id="scoreValue">0</span></div>
+      <div class="stat"><span class="label">Multiplier</span><span class="value" id="multiplierValue">x1</span></div>
+      <div class="stat"><span class="label">Time</span><span class="value" id="timeValue">0:00</span></div>
+      <div class="stat"><span class="label">Best Population</span><span class="value" id="bestPopulationValue">1</span></div>
+      <div class="stat"><span class="label">Ascension</span><span class="value" id="ascensionValue">0 / 3</span></div>
+    </div>
+    <div class="growth-shell" aria-label="Growth progress">
+      <div id="growthBar"></div>
+      <span id="growthText">Grow 0 / 4</span>
+    </div>
+    <div id="mutationStrip" aria-label="Active mutations">No mutations yet</div>
+  </header>
+
+  <div id="intro" aria-hidden="true">
+    <div class="eyebrow">SWARM</div>
+    <div class="line">MOVE THE SWARM</div>
+    <div class="line">EAT</div>
+    <div class="line">MULTIPLY</div>
+    <div class="line">FILL 3 BLACK HOLES</div>
+    <div class="line">BREAK THE CORE</div>
+    <div class="line">DON'T LOSE THEM</div>
+    <div class="move">MOUSE · WASD · ARROW KEYS</div>
+  </div>
+
+  <div id="toast" role="status"></div>
+  <div id="debugPanel" aria-hidden="true"></div>
+
+    <div class="control-hint">
+      Mouse / WASD to guide<br>
+      Click population to cull<br>
+      Tap D Debug · M Multiply · K Cull
+  </div>
+
+  <div class="score-rule" id="objectiveRule">
+    <strong id="objectiveTitle">ASCENSION 1 / 3</strong><br>
+    <span id="objectiveText">Black-hole quota · 12 population</span>
+  </div>
+
+  <section id="mutationDraft" aria-label="Choose a mutation">
+    <div class="mutation-card">
+      <div class="mutation-eyebrow">BLACK HOLE REWARD</div>
+      <h2>CHOOSE A MUTATION</h2>
+      <p id="mutationReason">Population converted</p>
+      <div id="mutationChoices"></div>
+      <p class="mutation-hint">Click a mutation · or press 1 / 2 / 3</p>
+    </div>
+  </section>
+
+  <section id="gameOver" aria-label="Game over">
+    <div class="game-over-card" id="resultCard">
+      <h1 id="resultTitle">SWARM LOST</h1>
+      <div class="lost-note" id="lostNote">Black-hole conversion score</div>
+      <div class="results">
+        <span>Population</span><strong id="resultPopulation">0</strong>
+        <span>Best Population</span><strong id="resultBestPopulation">0</strong>
+        <span>Score</span><strong id="resultScore">0</strong>
+        <span>Best Score</span><strong id="resultBestScore">0</strong>
+        <span>Survival Time</span><strong id="resultTime">0 sec</strong>
+        <span>Grade</span><strong id="resultGrade">—</strong>
+      </div>
+      <button id="restartButton" type="button">RESTART</button>
+      <p class="restart-hint">R or Space · instant retry</p>
+    </div>
+  </section>
+
+  <script>
+    'use strict';
+
+    // All high-impact tuning lives here so playtest changes stay quick and safe.
+    const CONFIG = Object.freeze({
+      initialPopulation: 1,
+      maxPopulation: 256,
+      creatureRadius: 4.2,
+      baseSpeed: 112,
+      maxSpeedFactor: 1.28,
+      steeringStrength: 3.1,
+      keyboardLeadDistance: 250,
+      separationRadius: 18,
+      separationForce: 0.82,
+      foodAttractionRadius: 92,
+      foodAttractionForce: 0.24,
+      randomDrift: 0.10,
+      chaosDrift: 0.54,
+      boundaryMargin: 54,
+
+      initialFoodCount: 15,
+      maxFoodCount: 62,
+      foodSpawnRate: 0.78,
+      foodRadius: 3.2,
+      goldFoodChance: 0.085,
+      goldFoodValue: 5,
+      foodToMultiply: 4,
+      foodThresholdGrowth: 1.25,
+      foodThresholdExponent: 0.62,
+
+      initialDangerCount: 2,
+      maxDangerCount: 12,
+      dangerMinRadius: 24,
+      dangerMaxRadius: 40,
+      firstDangerDelay: 14,
+      dangerSpawnIntervalStart: 19,
+      dangerSpawnIntervalEnd: 9,
+      dangerSpeedStart: 26,
+      dangerSpeedEnd: 68,
+      dangerSteering: 1.15,
+      dangerChaseDelay: 16,
+      dangerPredictionSeconds: 0.65,
+      dangerSafeSpawnDistance: 190,
+      shooterPreferredRange: 285,
+      laserTelegraphDuration: 1.35,
+      laserActiveDuration: 0.24,
+      laserCooldownMin: 5.4,
+      laserCooldownMax: 7.2,
+      laserWidth: 7,
+      bombSpeed: 158,
+      bombSplashRadius: 68,
+      bombCooldownMin: 5.2,
+      bombCooldownMax: 7.0,
+      toxicShotSpeed: 182,
+      toxicDuration: 10,
+      toxicSplashRadius: 56,
+      toxicCooldownMin: 6.8,
+      toxicCooldownMax: 8.8,
+      projectileMaxLife: 4.5,
+      manualKillRadius: 15,
+
+      blackHoleFirstSpawnMin: 18,
+      blackHoleFirstSpawnMax: 28,
+      blackHoleRadius: 32,
+      blackHoleSuctionRadius: 122,
+      blackHoleSuctionForce: 0.42,
+      blackHoleScorePerCreature: 70,
+      blackHoleMinimumPopulation: 1,
+      blackHoleSafeSpawnDistance: 210,
+      blackHoleSuccessDelay: 0.7,
+      ascensionQuotas: Object.freeze([12, 32, 70]),
+      ascensionDurations: Object.freeze([11, 9.5, 8]),
+      ascensionIntervalMin: Object.freeze([28, 22, 16]),
+      ascensionIntervalMax: Object.freeze([42, 30, 23]),
+      ascensionDifficultyBonus: 0.20,
+      ascensionSpawnMultipliers: Object.freeze([1, 0.78, 0.62, 0.46]),
+
+      coreRadius: 52,
+      coreHealth: 12,
+      coreDuration: 65,
+      coreLaserDamage: 3,
+      coreBombDamage: 2,
+      coreToxicBurstDamage: 2,
+      coreToxicImpactDamage: 1,
+      coreCollisionPadding: 2,
+      coreFinalEnemyTypes: Object.freeze(['laser', 'bomber', 'toxic']),
+      coreSpawnEnemyDelay: 2.5,
+
+      controlSignalSteeringBonus: 0.28,
+      controlSignalDisobedienceReduction: 0.32,
+      controlFormationRadiusBonus: 0.32,
+      controlFormationForceBonus: 0.38,
+      controlBrakeSpeedReduction: 0.10,
+      controlBrakeDriftReduction: 0.38,
+      controlBrakeSuctionReduction: 0.22,
+      growthRichDietBonus: 1,
+      growthThresholdReduction: 0.20,
+      growthBuddingBonus: 0.25,
+      greedVoidScoreBonus: 0.50,
+      greedVoidSuctionBonus: 0.32,
+      greedLastCallWindow: 3,
+      greedLastCallScoreMultiplier: 2,
+      greedLastCallSuctionBonus: 0.46,
+      greedCollateralBonusPerKill: 0.12,
+      greedCollateralMaxBonus: 0.60,
+      greedCollateralAttackSpeedBonus: 0.16,
+
+      comboWindow: 1.2,
+      comboDisplayTime: 1.7,
+      introDuration: 6.5,
+      particleLimit: 650,
+      popupLimit: 36,
+      difficultyRampSeconds: 125,
+      spatialCellSize: 42
+    });
+
+    const MUTATION_CATEGORIES = ['control', 'growth', 'greed'];
+    const MUTATIONS = Object.freeze([
+      {
+        id: 'signal_boost',
+        category: 'control',
+        name: 'SIGNAL BOOST',
+        description: 'The swarm responds 28% faster and resists late-game disobedience.',
+        cost: ''
+      },
+      {
+        id: 'wide_formation',
+        category: 'control',
+        name: 'WIDE FORMATION',
+        description: 'Creatures keep more distance, reducing bomb and toxin chain losses.',
+        cost: 'A wider swarm needs more room'
+      },
+      {
+        id: 'phase_brake',
+        category: 'control',
+        name: 'PHASE BRAKE',
+        description: 'Random drift and black-hole pull are reduced, making precision safer.',
+        cost: '10% lower movement speed'
+      },
+      {
+        id: 'rich_diet',
+        category: 'growth',
+        name: 'RICH DIET',
+        description: 'Every normal food grants +1 additional growth point.',
+        cost: ''
+      },
+      {
+        id: 'early_split',
+        category: 'growth',
+        name: 'EARLY SPLIT',
+        description: 'All future multiplication thresholds are 20% lower.',
+        cost: ''
+      },
+      {
+        id: 'overgrowth',
+        category: 'growth',
+        name: 'OVERGROWTH',
+        description: 'Every multiplication buds 25% extra creatures beyond the normal split.',
+        cost: 'Population becomes harder to control sooner'
+      },
+      {
+        id: 'void_feast',
+        category: 'greed',
+        name: 'VOID FEAST',
+        description: 'Black-hole conversions score 50% more.',
+        cost: 'Black-hole suction is 32% stronger'
+      },
+      {
+        id: 'last_call',
+        category: 'greed',
+        name: 'LAST CALL',
+        description: 'Conversions during a black hole\'s final 3 seconds score double.',
+        cost: 'Final suction surges by 46%'
+      },
+      {
+        id: 'collateral_market',
+        category: 'greed',
+        name: 'COLLATERAL MARKET',
+        description: 'Each enemy friendly-fire kill charges +12% for the next black-hole conversion, up to +60%.',
+        cost: 'Enemy weapons recharge 16% faster'
+      }
+    ]);
+
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d', { alpha: false });
+    const ui = {
+      population: document.getElementById('populationValue'),
+      score: document.getElementById('scoreValue'),
+      multiplier: document.getElementById('multiplierValue'),
+      time: document.getElementById('timeValue'),
+      bestPopulation: document.getElementById('bestPopulationValue'),
+      ascension: document.getElementById('ascensionValue'),
+      growthBar: document.getElementById('growthBar'),
+      growthText: document.getElementById('growthText'),
+      mutationStrip: document.getElementById('mutationStrip'),
+      mutationDraft: document.getElementById('mutationDraft'),
+      mutationReason: document.getElementById('mutationReason'),
+      mutationChoices: document.getElementById('mutationChoices'),
+      intro: document.getElementById('intro'),
+      toast: document.getElementById('toast'),
+      debug: document.getElementById('debugPanel'),
+      objectiveRule: document.getElementById('objectiveRule'),
+      objectiveTitle: document.getElementById('objectiveTitle'),
+      objectiveText: document.getElementById('objectiveText'),
+      gameOver: document.getElementById('gameOver'),
+      resultCard: document.getElementById('resultCard'),
+      resultTitle: document.getElementById('resultTitle'),
+      lostNote: document.getElementById('lostNote'),
+      resultPopulation: document.getElementById('resultPopulation'),
+      resultBestPopulation: document.getElementById('resultBestPopulation'),
+      resultScore: document.getElementById('resultScore'),
+      resultBestScore: document.getElementById('resultBestScore'),
+      resultTime: document.getElementById('resultTime'),
+      resultGrade: document.getElementById('resultGrade'),
+      restartButton: document.getElementById('restartButton')
+    };
+
+    const TAU = Math.PI * 2;
+    let width = window.innerWidth;
+    let height = window.innerHeight;
+    let dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let lastFrame = performance.now();
+    let fps = 60;
+    let toastTimer = 0;
+    let nextId = 1;
+    let dKeyDownAt = 0;
+
+    const creatures = [];
+    const foods = [];
+    const dangers = [];
+    const projectiles = [];
+    const particles = [];
+    const popups = [];
+    const blackHole = {
+      active: false,
+      x: 0,
+      y: 0,
+      radius: CONFIG.blackHoleRadius,
+      timeLeft: 0,
+      nextSpawn: 0,
+      phase: 0,
+      absorbed: 0,
+      quota: CONFIG.ascensionQuotas[0],
+      duration: CONFIG.ascensionDurations[0],
+      successTimer: 0
+    };
+    const core = {
+      active: false,
+      x: 0,
+      y: 0,
+      radius: CONFIG.coreRadius,
+      health: CONFIG.coreHealth,
+      maxHealth: CONFIG.coreHealth,
+      timeLeft: 0,
+      phase: 0,
+      hitFlash: 0
+    };
+    const keys = new Set();
+    const pointer = { x: width / 2, y: height / 2, active: true };
+
+    const records = {
+      bestPopulation: CONFIG.initialPopulation,
+      bestScore: 0
+    };
+
+    const game = {
+      mode: 'playing',
+      inputMode: 'mouse',
+      roundTime: 0,
+      totalTime: 0,
+      score: 0,
+      growth: 0,
+      roundPeak: 1,
+      totalPeak: 1,
+      foodSpawnAccumulator: 0,
+      dangerSpawnTimer: CONFIG.firstDangerDelay,
+      dangerSpawnCount: 0,
+      combo: 0,
+      comboTimer: 0,
+      lastEatTime: -99,
+      introTimer: CONFIG.introDuration,
+      flash: 0,
+      dangerFlash: 0,
+      debug: false,
+      difficulty: 0,
+      targetX: width / 2,
+      targetY: height / 2,
+      mutations: new Set(),
+      mutationChoices: [],
+      friendlyFireKills: 0,
+      collateralCharge: 0,
+      ascensionStage: 0,
+      failedAscensions: 0,
+      pendingFinale: false,
+      endReason: '',
+      clearGrade: '—'
+    };
+
+    function clamp(value, min, max) {
+      return Math.max(min, Math.min(max, value));
+    }
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
+    }
+
+    function random(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function formatNumber(value) {
+      return Math.max(0, Math.floor(value)).toLocaleString('en-US');
+    }
+
+    function formatTime(seconds) {
+      const whole = Math.max(0, Math.floor(seconds));
+      return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, '0')}`;
+    }
+
+    function multiplierFor(seconds) {
+      if (seconds >= 90) return 3;
+      if (seconds >= 60) return 2;
+      if (seconds >= 30) return 1.5;
+      return 1;
+    }
+
+    function hasMutation(id) {
+      return game.mutations.has(id);
+    }
+
+    function ascensionTotal() {
+      return CONFIG.ascensionQuotas.length;
+    }
+
+    function currentAscensionQuota() {
+      return CONFIG.ascensionQuotas[Math.min(game.ascensionStage, ascensionTotal() - 1)];
+    }
+
+    function currentBlackHoleDuration() {
+      return CONFIG.ascensionDurations[Math.min(game.ascensionStage, CONFIG.ascensionDurations.length - 1)];
+    }
+
+    function scheduleNextBlackHole() {
+      const index = Math.min(game.ascensionStage, CONFIG.ascensionIntervalMin.length - 1);
+      blackHole.nextSpawn = random(CONFIG.ascensionIntervalMin[index], CONFIG.ascensionIntervalMax[index]);
+    }
+
+    function blackHoleScoreMultiplier() {
+      let value = 1;
+      if (hasMutation('void_feast')) value *= 1 + CONFIG.greedVoidScoreBonus;
+      if (hasMutation('last_call') && blackHole.active && blackHole.timeLeft <= CONFIG.greedLastCallWindow) {
+        value *= CONFIG.greedLastCallScoreMultiplier;
+      }
+      if (hasMutation('collateral_market')) {
+        value *= 1 + Math.min(CONFIG.greedCollateralMaxBonus, game.collateralCharge * CONFIG.greedCollateralBonusPerKill);
+      }
+      return value;
+    }
+
+    function blackHolePayoutPerCreature() {
+      return Math.floor(CONFIG.blackHoleScorePerCreature * multiplierFor(game.roundTime) * blackHoleScoreMultiplier());
+    }
+
+    function enemyAttackCooldown(min, max) {
+      let modifier = hasMutation('collateral_market') ? 1 - CONFIG.greedCollateralAttackSpeedBonus : 1;
+      modifier *= 1 - Math.min(game.ascensionStage, ascensionTotal()) * 0.055;
+      if (core.active) modifier *= 0.74;
+      return random(min, max) * modifier;
+    }
+
+    function difficultyLabel(value) {
+      if (value < 0.18) return 'CALM';
+      if (value < 0.42) return 'GROWING';
+      if (value < 0.72) return 'UNSTABLE';
+      if (value < 1.02) return 'CHAOTIC';
+      return 'CRITICAL';
+    }
+
+    function multiplyThreshold(population = creatures.length) {
+      const scaled = Math.pow(Math.max(0, population - 1), CONFIG.foodThresholdExponent);
+      const threshold = CONFIG.foodToMultiply + scaled * CONFIG.foodThresholdGrowth;
+      return Math.max(1, Math.ceil(threshold * (hasMutation('early_split') ? 1 - CONFIG.growthThresholdReduction : 1)));
+    }
+
+    function resizeCanvas() {
+      const oldWidth = width || window.innerWidth;
+      const oldHeight = height || window.innerHeight;
+      width = Math.max(640, window.innerWidth);
+      height = Math.max(480, window.innerHeight);
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+
+      if (oldWidth > 0 && oldHeight > 0) {
+        const sx = width / oldWidth;
+        const sy = height / oldHeight;
+        for (const item of [...creatures, ...foods, ...dangers, ...projectiles, ...particles, ...popups]) {
+          item.x *= sx;
+          item.y *= sy;
+        }
+        if (blackHole.active) {
+          blackHole.x *= sx;
+          blackHole.y *= sy;
+        }
+        if (core.active) {
+          core.x *= sx;
+          core.y *= sy;
+        }
+        pointer.x *= sx;
+        pointer.y *= sy;
+      }
+    }
+
+    function createCreature(x, y, angle = Math.random() * TAU) {
+      const speed = CONFIG.baseSpeed * random(0.82, 1.02);
+      return {
+        id: nextId++,
+        x,
+        y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        radius: CONFIG.creatureRadius * random(0.86, 1.16),
+        obedience: random(0.88, 1.12),
+        wanderAngle: random(0, TAU),
+        phase: random(0, TAU),
+        pulse: 0,
+        poisonTimer: 0,
+        poisonMax: 0,
+        alive: true,
+        trailTimer: random(0, 0.25)
+      };
+    }
+
+    function addCreature(x, y, angle) {
+      if (creatures.length >= CONFIG.maxPopulation) return null;
+      const creature = createCreature(x, y, angle);
+      creatures.push(creature);
+      return creature;
+    }
+
+    function pointInsideDanger(x, y, padding = 0) {
+      for (const danger of dangers) {
+        if (!danger.alive) continue;
+        const dx = x - danger.x;
+        const dy = y - danger.y;
+        const radius = danger.radius + padding;
+        if (dx * dx + dy * dy < radius * radius) return true;
+      }
+      return false;
+    }
+
+    function createDanger(initial = false, forcedType = null) {
+      const type = forcedType || nextDangerType();
+      const radiusScale = {
+        chaser: 1,
+        wanderer: 0.88,
+        laser: 0.82,
+        bomber: 0.9,
+        toxic: 0.84
+      }[type] || 1;
+      const radius = random(CONFIG.dangerMinRadius, CONFIG.dangerMaxRadius) * radiusScale;
+      let x = radius + 34;
+      let y = radius + 100;
+      let attempts = 0;
+      const center = swarmCenter();
+
+      do {
+        if (initial || (game.roundTime < 45 && Math.random() < 0.72)) {
+          const edge = Math.floor(Math.random() * 4);
+          if (edge < 2) {
+            x = edge === 0 ? radius + 42 : width - radius - 42;
+            y = random(120, height - 70);
+          } else {
+            x = random(70, width - 70);
+            y = edge === 2 ? radius + 96 : height - radius - 48;
+          }
+        } else {
+          x = random(radius + 50, width - radius - 50);
+          y = random(radius + 100, height - radius - 55);
+        }
+        attempts++;
+      } while (
+        attempts < 50 &&
+        (Math.hypot(x - center.x, y - center.y) < CONFIG.dangerSafeSpawnDistance ||
+          pointInsideDanger(x, y, radius + 50) ||
+          (core.active && Math.hypot(x - core.x, y - core.y) < core.radius + radius + 65))
+      );
+
+      const angle = random(0, TAU);
+      const speed = CONFIG.dangerSpeedStart * random(0.82, 1.15);
+      const cooldown = type === 'laser'
+        ? enemyAttackCooldown(2.4, 4.1)
+        : type === 'bomber'
+          ? enemyAttackCooldown(2.8, 4.4)
+          : type === 'toxic'
+            ? enemyAttackCooldown(3.4, 5.1)
+            : 0;
+      const danger = {
+        id: nextId++,
+        x,
+        y,
+        type,
+        radius,
+        phase: random(0, TAU),
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        speedFactor: random(0.88, 1.12),
+        orbitDirection: Math.random() < 0.5 ? -1 : 1,
+        turnPhase: random(0, TAU),
+        wanderTimer: random(1.4, 3.2),
+        wanderAngle: angle,
+        attackState: 'idle',
+        attackTimer: 0,
+        cooldown,
+        aimAngle: angle,
+        poisonTimer: 0,
+        poisonMax: 0,
+        alive: true
+      };
+      dangers.push(danger);
+      return danger;
+    }
+
+    function nextDangerType() {
+      const guaranteed = ['laser', 'bomber', 'toxic'];
+      if (game.dangerSpawnCount < guaranteed.length) return guaranteed[game.dangerSpawnCount];
+      const roll = Math.random();
+      if (core.active) {
+        if (roll < 0.12) return 'chaser';
+        if (roll < 0.22) return 'wanderer';
+        if (roll < 0.50) return 'laser';
+        if (roll < 0.76) return 'bomber';
+        return 'toxic';
+      }
+      if (game.ascensionStage >= 2) {
+        if (roll < 0.16) return 'chaser';
+        if (roll < 0.28) return 'wanderer';
+        if (roll < 0.52) return 'laser';
+        if (roll < 0.76) return 'bomber';
+        return 'toxic';
+      }
+      if (game.ascensionStage === 1) {
+        if (roll < 0.21) return 'chaser';
+        if (roll < 0.38) return 'wanderer';
+        if (roll < 0.61) return 'laser';
+        if (roll < 0.82) return 'bomber';
+        return 'toxic';
+      }
+      if (roll < 0.26) return 'chaser';
+      if (roll < 0.46) return 'wanderer';
+      if (roll < 0.65) return 'laser';
+      if (roll < 0.83) return 'bomber';
+      return 'toxic';
+    }
+
+    function findRiskFoodPosition(gold) {
+      if (dangers.length === 0) return null;
+      const danger = dangers[Math.floor(Math.random() * dangers.length)];
+      for (let attempt = 0; attempt < 16; attempt++) {
+        const angle = random(0, TAU);
+        const distance = danger.radius + random(gold ? 19 : 35, gold ? 48 : 92);
+        const x = danger.x + Math.cos(angle) * distance;
+        const y = danger.y + Math.sin(angle) * distance;
+        if (
+          x > 30 && x < width - 30 && y > 100 && y < height - 35 &&
+          !pointInsideDanger(x, y, 7)
+        ) return { x, y };
+      }
+      return null;
+    }
+
+    function addFood(x, y, gold = false) {
+      foods.push({
+        id: nextId++,
+        x,
+        y,
+        radius: gold ? 6.2 : CONFIG.foodRadius * random(0.82, 1.22),
+        gold,
+        phase: random(0, TAU),
+        eaten: false
+      });
+    }
+
+    function spawnFood(forceGold = false, initial = false, nearStart = false) {
+      if (foods.length >= CONFIG.maxFoodCount) return;
+      const gold = forceGold || (!initial && Math.random() < CONFIG.goldFoodChance);
+      const riskChance = game.roundTime < 18 ? 0 : clamp(0.12 + game.difficulty * 0.35 + (gold ? 0.38 : 0), 0, 0.82);
+      let position = null;
+
+      if (!initial && Math.random() < riskChance) {
+        position = findRiskFoodPosition(gold);
+      }
+
+      if (!position && nearStart) {
+        const angle = random(0, TAU);
+        const distance = random(78, Math.min(190, Math.max(90, Math.min(width, height) * 0.25)));
+        position = {
+          x: width * 0.5 + Math.cos(angle) * distance,
+          y: height * 0.53 + Math.sin(angle) * distance
+        };
+      }
+
+      if (!position) {
+        for (let attempt = 0; attempt < 45; attempt++) {
+          const x = random(34, width - 34);
+          const y = random(105, height - 38);
+          if (!pointInsideDanger(x, y, gold ? 11 : 18)) {
+            position = { x, y };
+            break;
+          }
+        }
+      }
+
+      if (position) {
+        position.x = clamp(position.x, 28, width - 28);
+        position.y = clamp(position.y, 96, height - 28);
+        addFood(position.x, position.y, gold);
+      }
+    }
+
+    function spawnInitialField() {
+      const initialTypes = ['chaser', 'wanderer'];
+      for (let i = 0; i < CONFIG.initialDangerCount; i++) {
+        createDanger(true, initialTypes[i % initialTypes.length]);
+      }
+      for (let i = 0; i < CONFIG.initialFoodCount; i++) spawnFood(false, true, i < 8);
+    }
+
+    function spawnBlackHole() {
+      if (core.active || game.ascensionStage >= ascensionTotal()) return;
+      const center = swarmCenter();
+      let position = null;
+      const maxDistance = Math.min(430, Math.max(260, Math.min(width, height) * 0.48));
+
+      for (let attempt = 0; attempt < 50; attempt++) {
+        const angle = random(0, TAU);
+        const distance = random(CONFIG.blackHoleSafeSpawnDistance, maxDistance);
+        const x = center.x + Math.cos(angle) * distance;
+        const y = center.y + Math.sin(angle) * distance;
+        if (
+          x > 78 && x < width - 78 && y > 128 && y < height - 76 &&
+          !pointInsideDanger(x, y, 72)
+        ) {
+          position = { x, y };
+          break;
+        }
+      }
+
+      if (!position) {
+        position = {
+          x: random(90, width - 90),
+          y: random(135, height - 85)
+        };
+      }
+
+      blackHole.active = true;
+      blackHole.x = position.x;
+      blackHole.y = position.y;
+      blackHole.duration = currentBlackHoleDuration();
+      blackHole.timeLeft = blackHole.duration;
+      blackHole.phase = 0;
+      blackHole.absorbed = 0;
+      blackHole.quota = currentAscensionQuota();
+      blackHole.successTimer = 0;
+      showToast(`ASCENSION ${game.ascensionStage + 1} · CONVERT ${blackHole.quota}`);
+    }
+
+    function renderMutationStrip() {
+      ui.mutationStrip.replaceChildren();
+      if (game.mutations.size === 0) {
+        ui.mutationStrip.textContent = 'No mutations yet';
+        return;
+      }
+      for (const mutation of MUTATIONS) {
+        if (!game.mutations.has(mutation.id)) continue;
+        const chip = document.createElement('span');
+        chip.className = `mutation-chip ${mutation.category}`;
+        chip.textContent = mutation.name;
+        ui.mutationStrip.appendChild(chip);
+      }
+    }
+
+    function buildMutationChoices() {
+      const choices = [];
+      for (const category of MUTATION_CATEGORIES) {
+        const available = MUTATIONS.filter(mutation => mutation.category === category && !game.mutations.has(mutation.id));
+        if (available.length > 0) choices.push(available[Math.floor(Math.random() * available.length)]);
+      }
+      return choices;
+    }
+
+    function openMutationDraft() {
+      if (game.mode !== 'playing') return false;
+      const choices = buildMutationChoices();
+      if (choices.length === 0) {
+        showToast('ALL MUTATIONS MASTERED');
+        if (game.pendingFinale) {
+          game.pendingFinale = false;
+          spawnCore();
+        }
+        return false;
+      }
+
+      game.mode = 'mutation';
+      game.mutationChoices = choices;
+      ui.mutationReason.textContent = `Ascension ${game.ascensionStage} / ${ascensionTotal()} complete · mutation lasts for this run`;
+      ui.mutationChoices.replaceChildren();
+      ui.mutationChoices.style.gridTemplateColumns = `repeat(${choices.length}, minmax(0, 1fr))`;
+
+      choices.forEach((mutation, index) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = `mutation-choice ${mutation.category}`;
+        button.dataset.mutationId = mutation.id;
+
+        const number = document.createElement('span');
+        number.className = 'mutation-number';
+        number.textContent = String(index + 1);
+        const type = document.createElement('span');
+        type.className = 'mutation-type';
+        type.textContent = mutation.category;
+        const name = document.createElement('span');
+        name.className = 'mutation-name';
+        name.textContent = mutation.name;
+        const description = document.createElement('span');
+        description.className = 'mutation-description';
+        description.textContent = mutation.description;
+
+        button.append(number, type, name, description);
+        if (mutation.cost) {
+          const cost = document.createElement('span');
+          cost.className = 'mutation-cost';
+          cost.textContent = `Tradeoff · ${mutation.cost}`;
+          button.appendChild(cost);
+        }
+        button.addEventListener('click', () => selectMutation(mutation.id));
+        ui.mutationChoices.appendChild(button);
+      });
+
+      ui.mutationDraft.classList.add('visible');
+      ui.mutationDraft.setAttribute('aria-hidden', 'false');
+      const firstChoice = ui.mutationChoices.querySelector('button');
+      if (firstChoice) firstChoice.focus({ preventScroll: true });
+      return true;
+    }
+
+    function selectMutation(id) {
+      if (game.mode !== 'mutation') return false;
+      const mutation = game.mutationChoices.find(choice => choice.id === id);
+      if (!mutation || game.mutations.has(id)) return false;
+      game.mutations.add(id);
+      game.mutationChoices = [];
+      game.mode = 'playing';
+      ui.mutationDraft.classList.remove('visible');
+      ui.mutationDraft.setAttribute('aria-hidden', 'true');
+      renderMutationStrip();
+      showToast(`${mutation.category.toUpperCase()} · ${mutation.name}`);
+      addPopup(width / 2, height * 0.42, mutation.name, mutation.category === 'control' ? '#77ddff' : mutation.category === 'growth' ? '#91ff74' : '#e0a3ff', 18, 1.25);
+      if (game.pendingFinale) {
+        game.pendingFinale = false;
+        spawnCore();
+      }
+      lastFrame = performance.now();
+      return true;
+    }
+
+    function closeBlackHole(success = false) {
+      if (!blackHole.active) return;
+      addParticle(blackHole.x, blackHole.y, success ? '#d7adff' : '#a96cff', success ? 46 : 24, success ? 145 : 95, success ? 3.8 : 2.8);
+      blackHole.active = false;
+      blackHole.timeLeft = 0;
+      blackHole.successTimer = 0;
+      if (success) {
+        game.ascensionStage = Math.min(ascensionTotal(), game.ascensionStage + 1);
+        game.pendingFinale = game.ascensionStage >= ascensionTotal();
+        addPopup(blackHole.x, blackHole.y - 24, `ASCENSION ${game.ascensionStage} / ${ascensionTotal()}`, '#edd5ff', 19, 1.35);
+        if (!game.pendingFinale) scheduleNextBlackHole();
+        openMutationDraft();
+        game.collateralCharge = 0;
+      } else {
+        game.failedAscensions++;
+        scheduleNextBlackHole();
+        showToast(`ASCENSION MISSED · ${blackHole.absorbed} / ${blackHole.quota}`);
+        addPopup(blackHole.x, blackHole.y - 24, `NEED ${blackHole.quota - blackHole.absorbed} MORE`, '#ff9ab0', 13, 1.1);
+      }
+    }
+
+    function findCorePosition() {
+      const center = swarmCenter();
+      const candidates = [
+        { x: width * 0.50, y: height * 0.54 },
+        { x: width * 0.28, y: height * 0.38 },
+        { x: width * 0.72, y: height * 0.38 },
+        { x: width * 0.28, y: height * 0.72 },
+        { x: width * 0.72, y: height * 0.72 }
+      ];
+      let best = candidates[0];
+      let bestScore = -Infinity;
+      for (const candidate of candidates) {
+        const dangerPenalty = pointInsideDanger(candidate.x, candidate.y, CONFIG.coreRadius + 60) ? 240 : 0;
+        const score = Math.hypot(candidate.x - center.x, candidate.y - center.y) - dangerPenalty;
+        if (score > bestScore) {
+          best = candidate;
+          bestScore = score;
+        }
+      }
+      return best;
+    }
+
+    function spawnCore() {
+      if (core.active || game.mode !== 'playing') return;
+      const position = findCorePosition();
+      core.active = true;
+      core.x = position.x;
+      core.y = position.y;
+      core.health = CONFIG.coreHealth;
+      core.maxHealth = CONFIG.coreHealth;
+      core.timeLeft = CONFIG.coreDuration;
+      core.phase = 0;
+      core.hitFlash = 0;
+      blackHole.active = false;
+      blackHole.nextSpawn = Infinity;
+      projectiles.length = 0;
+      game.dangerSpawnTimer = CONFIG.coreSpawnEnemyDelay;
+
+      for (const type of CONFIG.coreFinalEnemyTypes) {
+        if (dangers.length >= CONFIG.maxDangerCount) break;
+        if (!dangers.some(danger => danger.alive && danger.type === type)) createDanger(false, type);
+      }
+
+      addParticle(core.x, core.y, '#ff4e83', 64, 175, 4.2);
+      addPopup(core.x, core.y - core.radius - 34, 'THE CORE', '#ffd5e2', 24, 1.7);
+      showToast('FINAL ASCENSION · BAIT ENEMY FIRE INTO THE CORE');
+      game.flash = Math.max(game.flash, 0.18);
+    }
+
+    function damageCore(amount, source) {
+      if (!core.active || game.mode !== 'playing' || amount <= 0) return false;
+      core.health = Math.max(0, core.health - amount);
+      core.hitFlash = 1;
+      addParticle(core.x, core.y, source === 'toxic' ? '#b6ff54' : source === 'bomb' ? '#ffb34f' : '#ff6db5', 26, 145, 3.4);
+      addPopup(core.x, core.y - core.radius - 19, `${source.toUpperCase()} · CORE -${amount}`, '#ffd5e4', 12, 0.95);
+      game.flash = Math.max(game.flash, 0.08);
+      if (core.health <= 0) winGame();
+      return true;
+    }
+
+    function updateCore(dt) {
+      if (!core.active) return;
+      core.phase += dt * 2.4;
+      core.hitFlash = Math.max(0, core.hitFlash - dt * 3.2);
+      core.timeLeft -= dt;
+      if (core.timeLeft <= 0) {
+        core.timeLeft = 0;
+        endGame('core_timeout');
+        return;
+      }
+
+      let removed = 0;
+      for (const creature of creatures) {
+        if (!creature.alive) continue;
+        const dx = creature.x - core.x;
+        const dy = creature.y - core.y;
+        const lethalRadius = core.radius + creature.radius + CONFIG.coreCollisionPadding;
+        if (dx * dx + dy * dy <= lethalRadius * lethalRadius) {
+          killCreature(creature, 'core');
+          removed++;
+        }
+      }
+      if (removed > 0) {
+        removeDeadCreatures();
+        addPopup(core.x, core.y + core.radius + 22, `CORE CONTACT · -${removed}`, '#ff7d98', 11, 0.85);
+      }
+    }
+
+    function swarmCenter() {
+      if (creatures.length === 0) return { x: width / 2, y: height / 2 };
+      let x = 0;
+      let y = 0;
+      let count = 0;
+      for (const creature of creatures) {
+        if (!creature.alive) continue;
+        x += creature.x;
+        y += creature.y;
+        count++;
+      }
+      return count ? { x: x / count, y: y / count } : { x: width / 2, y: height / 2 };
+    }
+
+    function beginRound() {
+      creatures.length = 0;
+      foods.length = 0;
+      dangers.length = 0;
+      projectiles.length = 0;
+      particles.length = 0;
+      popups.length = 0;
+      blackHole.active = false;
+      blackHole.timeLeft = 0;
+      blackHole.nextSpawn = random(CONFIG.blackHoleFirstSpawnMin, CONFIG.blackHoleFirstSpawnMax);
+      blackHole.phase = 0;
+      blackHole.absorbed = 0;
+      blackHole.quota = CONFIG.ascensionQuotas[0];
+      blackHole.duration = CONFIG.ascensionDurations[0];
+      blackHole.successTimer = 0;
+      core.active = false;
+      core.health = CONFIG.coreHealth;
+      core.maxHealth = CONFIG.coreHealth;
+      core.timeLeft = 0;
+      core.phase = 0;
+      core.hitFlash = 0;
+      game.mode = 'playing';
+      game.roundTime = 0;
+      game.growth = 0;
+      game.roundPeak = CONFIG.initialPopulation;
+      game.foodSpawnAccumulator = 0;
+      game.dangerSpawnTimer = CONFIG.firstDangerDelay;
+      game.dangerSpawnCount = 0;
+      game.combo = 0;
+      game.comboTimer = 0;
+      game.lastEatTime = -99;
+      game.flash = 0;
+      game.dangerFlash = 0;
+      game.difficulty = 0;
+      game.friendlyFireKills = 0;
+      game.collateralCharge = 0;
+      game.ascensionStage = 0;
+      game.failedAscensions = 0;
+      game.pendingFinale = false;
+      game.endReason = '';
+      game.clearGrade = '—';
+      game.targetX = width / 2;
+      game.targetY = height / 2;
+      pointer.x = width / 2;
+      pointer.y = height / 2;
+
+      for (let i = 0; i < CONFIG.initialPopulation; i++) {
+        addCreature(width / 2 + random(-4, 4), height * 0.53 + random(-4, 4));
+      }
+      spawnInitialField();
+      ui.gameOver.classList.remove('visible');
+      ui.resultCard.classList.remove('victory');
+    }
+
+    function restartGame() {
+      keys.clear();
+      dKeyDownAt = 0;
+      game.score = 0;
+      game.totalTime = 0;
+      game.totalPeak = CONFIG.initialPopulation;
+      game.introTimer = 2.8;
+      game.inputMode = 'mouse';
+      game.debug = false;
+      game.mutations.clear();
+      game.mutationChoices = [];
+      toastTimer = 0;
+      ui.toast.classList.remove('show');
+      ui.debug.classList.remove('visible');
+      ui.debug.setAttribute('aria-hidden', 'true');
+      ui.intro.classList.remove('hidden');
+      ui.mutationDraft.classList.remove('visible');
+      ui.mutationDraft.setAttribute('aria-hidden', 'true');
+      ui.resultTitle.textContent = 'SWARM LOST';
+      ui.resultGrade.textContent = '—';
+      renderMutationStrip();
+      beginRound();
+      lastFrame = performance.now();
+    }
+
+    function showToast(text) {
+      ui.toast.textContent = text;
+      ui.toast.classList.add('show');
+      toastTimer = 1.8;
+    }
+
+    function addPopup(x, y, text, color = '#d8fff4', size = 12, life = 0.9) {
+      if (popups.length >= CONFIG.popupLimit) popups.shift();
+      popups.push({ x, y, text, color, size, life, maxLife: life, vy: -25 });
+    }
+
+    function addParticle(x, y, color, count, speed = 55, size = 2.2) {
+      const available = Math.max(0, CONFIG.particleLimit - particles.length);
+      count = Math.min(count, available);
+      for (let i = 0; i < count; i++) {
+        const angle = random(0, TAU);
+        const velocity = speed * random(0.25, 1);
+        const life = random(0.28, 0.68);
+        particles.push({
+          x,
+          y,
+          vx: Math.cos(angle) * velocity,
+          vy: Math.sin(angle) * velocity,
+          color,
+          size: size * random(0.45, 1.25),
+          life,
+          maxLife: life
+        });
+      }
+    }
+
+    function addTrail(creature) {
+      if (particles.length >= CONFIG.particleLimit) return;
+      const life = random(0.18, 0.32);
+      particles.push({
+        x: creature.x - creature.vx * 0.025,
+        y: creature.y - creature.vy * 0.025,
+        vx: -creature.vx * 0.04,
+        vy: -creature.vy * 0.04,
+        color: '#5cbcff',
+        size: random(0.7, 1.5),
+        life,
+        maxLife: life
+      });
+    }
+
+    function performMultiply(force = false) {
+      if (game.mode !== 'playing' || creatures.length >= CONFIG.maxPopulation) return false;
+      const startingCount = creatures.length;
+      const copyCount = Math.min(startingCount, CONFIG.maxPopulation - startingCount);
+      if (copyCount <= 0) return false;
+      const snapshot = creatures.slice(0, copyCount);
+      let created = 0;
+
+      for (const parent of snapshot) {
+        const angle = Math.atan2(parent.vy, parent.vx) + random(-1.25, 1.25);
+        const offsetAngle = random(0, TAU);
+        const offset = random(7, 13);
+        const child = addCreature(
+          parent.x + Math.cos(offsetAngle) * offset,
+          parent.y + Math.sin(offsetAngle) * offset,
+          angle
+        );
+        if (child) {
+          created++;
+          child.pulse = 1;
+          parent.pulse = 1;
+          parent.vx -= Math.cos(offsetAngle) * 28;
+          parent.vy -= Math.sin(offsetAngle) * 28;
+        }
+      }
+
+      if (hasMutation('overgrowth') && creatures.length < CONFIG.maxPopulation) {
+        const bonusCount = Math.min(
+          Math.max(1, Math.round(startingCount * CONFIG.growthBuddingBonus)),
+          CONFIG.maxPopulation - creatures.length
+        );
+        for (let i = 0; i < bonusCount; i++) {
+          const parent = snapshot[i % snapshot.length];
+          const offsetAngle = random(0, TAU);
+          const child = addCreature(
+            parent.x + Math.cos(offsetAngle) * random(9, 16),
+            parent.y + Math.sin(offsetAngle) * random(9, 16),
+            Math.atan2(parent.vy, parent.vx) + random(-1.5, 1.5)
+          );
+          if (child) {
+            child.pulse = 1;
+            created++;
+          }
+        }
+      }
+
+      const center = swarmCenter();
+      addParticle(center.x, center.y, '#77cfff', Math.min(55, 14 + created * 2), 125, 3);
+      addPopup(center.x, center.y - 24, 'MULTIPLY!', '#d9f3ff', 19, 1.25);
+      addPopup(center.x, center.y + 2, `+${created} SWARM`, '#73c9ff', 11, 1.0);
+      game.flash = Math.max(game.flash, 0.16);
+      game.roundPeak = Math.max(game.roundPeak, creatures.length);
+      game.totalPeak = Math.max(game.totalPeak, creatures.length);
+      records.bestPopulation = Math.max(records.bestPopulation, creatures.length);
+      if (force) showToast(`DEBUG MULTIPLY · ${creatures.length}`);
+      return true;
+    }
+
+    function eatFood(food, creature) {
+      if (food.eaten) return;
+      food.eaten = true;
+      const value = food.gold ? CONFIG.goldFoodValue : 1 + (hasMutation('rich_diet') ? CONFIG.growthRichDietBonus : 0);
+      game.growth += value;
+
+      if (game.roundTime - game.lastEatTime <= CONFIG.comboWindow) {
+        game.combo++;
+      } else {
+        game.combo = 1;
+      }
+      game.lastEatTime = game.roundTime;
+      game.comboTimer = CONFIG.comboDisplayTime;
+      creature.pulse = 1;
+
+      addParticle(food.x, food.y, food.gold ? '#ffd95f' : '#8cff67', food.gold ? 18 : 7, food.gold ? 105 : 58, food.gold ? 3.2 : 2);
+      addPopup(food.x, food.y - 9, food.gold ? '+5 GROW' : `+${value} GROW`, food.gold ? '#ffe37d' : '#baff9f', food.gold ? 13 : 10, 0.72);
+      if (food.gold) {
+        addPopup(food.x, food.y - 26, 'GOLD +5 GROWTH', '#ffd95f', 10, 1.1);
+        game.flash = Math.max(game.flash, 0.1);
+      }
+      if (game.combo === 3 || game.combo === 5 || (game.combo >= 8 && game.combo % 3 === 0)) {
+        addPopup(creature.x, creature.y - 28, `${game.combo}x COMBO`, '#ffffff', 13 + Math.min(5, game.combo * 0.35), 1.0);
+      }
+
+      let guard = 0;
+      while (guard++ < 4 && creatures.length < CONFIG.maxPopulation) {
+        const threshold = multiplyThreshold();
+        if (game.growth < threshold) break;
+        game.growth -= threshold;
+        performMultiply(false);
+      }
+    }
+
+    function killCreature(creature, reason = 'enemy') {
+      if (!creature.alive) return;
+      creature.alive = false;
+      const color = reason === 'manual' ? '#d7f5ff' : reason === 'toxic' ? '#b6ff4d' : '#ff5b72';
+      addParticle(creature.x, creature.y, color, 8, 82, 2.6);
+      if (reason !== 'manual') game.dangerFlash = Math.min(0.22, game.dangerFlash + 0.025);
+    }
+
+    function killDanger(danger, cause = 'friendly_fire') {
+      if (!danger.alive) return false;
+      danger.alive = false;
+      game.friendlyFireKills++;
+      const charged = hasMutation('collateral_market');
+      if (charged) game.collateralCharge++;
+      addParticle(danger.x, danger.y, '#ffda86', 24, 135, 3.1);
+      addPopup(
+        danger.x,
+        danger.y - danger.radius - 18,
+        charged ? `VOID CHARGE · +${Math.round(CONFIG.greedCollateralBonusPerKill * 100)}%` : 'FRIENDLY FIRE',
+        charged ? '#f2bdff' : '#ffd08a',
+        11,
+        1.0
+      );
+      return true;
+    }
+
+    function removeDeadDangers() {
+      let removed = 0;
+      for (let i = dangers.length - 1; i >= 0; i--) {
+        if (!dangers[i].alive) {
+          dangers.splice(i, 1);
+          removed++;
+        }
+      }
+      return removed;
+    }
+
+    function removeDeadCreatures() {
+      let removed = 0;
+      for (let i = creatures.length - 1; i >= 0; i--) {
+        if (!creatures[i].alive) {
+          creatures.splice(i, 1);
+          removed++;
+        }
+      }
+      if (creatures.length === 0) endGame();
+      return removed;
+    }
+
+    function manualCullAt(x, y) {
+      if (game.mode !== 'playing') return false;
+      let closest = null;
+      let closestPoisoned = null;
+      let closestSq = CONFIG.manualKillRadius * CONFIG.manualKillRadius;
+      let closestPoisonedSq = closestSq;
+      for (const creature of creatures) {
+        if (!creature.alive) continue;
+        const dx = creature.x - x;
+        const dy = creature.y - y;
+        const distanceSq = dx * dx + dy * dy;
+        if (distanceSq <= closestSq) {
+          closest = creature;
+          closestSq = distanceSq;
+        }
+        if (creature.poisonTimer > 0 && distanceSq <= closestPoisonedSq) {
+          closestPoisoned = creature;
+          closestPoisonedSq = distanceSq;
+        }
+      }
+      const target = closestPoisoned || closest;
+      if (!target) return false;
+      const wasPoisoned = target.poisonTimer > 0;
+      killCreature(target, 'manual');
+      addPopup(target.x, target.y - 15, wasPoisoned ? 'POISON CULLED' : 'CULLED', wasPoisoned ? '#c9ff71' : '#d7f5ff', 10, 0.8);
+      removeDeadCreatures();
+      return true;
+    }
+
+    function cullCreatures() {
+      if (game.mode !== 'playing' || creatures.length === 0) return;
+      const count = Math.max(1, Math.ceil(creatures.length * 0.25));
+      for (let i = 0; i < count && i < creatures.length; i++) {
+        killCreature(creatures[creatures.length - 1 - i]);
+      }
+      removeDeadCreatures();
+      showToast(`DEBUG CULL · -${count}`);
+    }
+
+    function clearGrade() {
+      if (game.roundTime <= 180 && creatures.length >= 30 && game.failedAscensions === 0) return 'S';
+      if (game.roundTime <= 210 && creatures.length >= 15) return 'A';
+      if (game.roundTime <= 270) return 'B';
+      return 'C';
+    }
+
+    function populateResults() {
+      records.bestPopulation = Math.max(records.bestPopulation, game.roundPeak, game.totalPeak);
+      records.bestScore = Math.max(records.bestScore, game.score);
+      ui.resultPopulation.textContent = formatNumber(game.mode === 'victory' ? creatures.length : game.roundPeak);
+      ui.resultBestPopulation.textContent = formatNumber(records.bestPopulation);
+      ui.resultScore.textContent = formatNumber(game.score);
+      ui.resultBestScore.textContent = formatNumber(records.bestScore);
+      ui.resultTime.textContent = `${Math.floor(game.roundTime)} sec`;
+      ui.resultGrade.textContent = game.clearGrade;
+      ui.gameOver.classList.add('visible');
+      ui.restartButton.focus({ preventScroll: true });
+    }
+
+    function endGame(reason = 'annihilated') {
+      if (game.mode !== 'playing') return;
+      game.mode = 'gameover';
+      game.endReason = reason;
+      game.clearGrade = '—';
+      core.active = false;
+      ui.resultCard.classList.remove('victory');
+      ui.resultTitle.textContent = reason === 'core_timeout' ? 'CORE COLLAPSE' : 'SWARM LOST';
+      ui.lostNote.textContent = reason === 'core_timeout'
+        ? 'The Core survived · lure enemy fire more aggressively'
+        : `Ascension ${game.ascensionStage} / ${ascensionTotal()} · the swarm was lost`;
+      populateResults();
+    }
+
+    function winGame() {
+      if (game.mode !== 'playing' || !core.active) return;
+      const survivors = creatures.reduce((count, creature) => count + (creature.alive ? 1 : 0), 0);
+      if (survivors === 0) {
+        endGame('annihilated');
+        return;
+      }
+      removeDeadCreatures();
+      game.mode = 'victory';
+      game.endReason = 'core_destroyed';
+      game.clearGrade = clearGrade();
+      core.active = false;
+      addParticle(core.x, core.y, '#b7ffe9', 90, 220, 4.8);
+      ui.resultCard.classList.add('victory');
+      ui.resultTitle.textContent = 'SWARM ASCENDED';
+      ui.lostNote.textContent = 'The Core has fallen · Ascension complete';
+      populateResults();
+    }
+
+    function gridKey(x, y, cellSize = CONFIG.spatialCellSize) {
+      return `${Math.floor(x / cellSize)},${Math.floor(y / cellSize)}`;
+    }
+
+    function buildGrid(items, cellSize = CONFIG.spatialCellSize) {
+      const grid = new Map();
+      for (const item of items) {
+        if (item.alive === false || item.eaten === true) continue;
+        const key = gridKey(item.x, item.y, cellSize);
+        let bucket = grid.get(key);
+        if (!bucket) {
+          bucket = [];
+          grid.set(key, bucket);
+        }
+        bucket.push(item);
+      }
+      return grid;
+    }
+
+    function forNearby(grid, x, y, cellSize, radius, callback) {
+      const minX = Math.floor((x - radius) / cellSize);
+      const maxX = Math.floor((x + radius) / cellSize);
+      const minY = Math.floor((y - radius) / cellSize);
+      const maxY = Math.floor((y + radius) / cellSize);
+      for (let gy = minY; gy <= maxY; gy++) {
+        for (let gx = minX; gx <= maxX; gx++) {
+          const bucket = grid.get(`${gx},${gy}`);
+          if (!bucket) continue;
+          for (const item of bucket) callback(item);
+        }
+      }
+    }
+
+    function resolveTarget(center) {
+      let dx = 0;
+      let dy = 0;
+      if (keys.has('w') || keys.has('arrowup')) dy -= 1;
+      if (keys.has('s') || keys.has('arrowdown')) dy += 1;
+      if (keys.has('a') || keys.has('arrowleft')) dx -= 1;
+      if (keys.has('d') || keys.has('arrowright')) dx += 1;
+
+      if (dx !== 0 || dy !== 0) {
+        const length = Math.hypot(dx, dy);
+        game.inputMode = 'keyboard';
+        game.targetX = clamp(center.x + (dx / length) * CONFIG.keyboardLeadDistance, 20, width - 20);
+        game.targetY = clamp(center.y + (dy / length) * CONFIG.keyboardLeadDistance, 92, height - 20);
+      } else if (game.inputMode === 'mouse') {
+        game.targetX = pointer.x;
+        game.targetY = pointer.y;
+      }
+    }
+
+    function updateCreatures(dt) {
+      const center = swarmCenter();
+      resolveTarget(center);
+
+      const population = Math.max(1, creatures.length);
+      const populationChaos = clamp(Math.log2(population) / Math.log2(CONFIG.maxPopulation), 0, 1);
+      const timeChaos = clamp(game.roundTime / CONFIG.difficultyRampSeconds, 0, 1.25);
+      const ascensionPressure = game.ascensionStage * CONFIG.ascensionDifficultyBonus + (core.active ? 0.32 : 0);
+      game.difficulty = clamp(timeChaos * 0.72 + populationChaos * 0.47 + ascensionPressure, 0, 1.65);
+
+      const creatureGrid = buildGrid(creatures);
+      const foodGrid = buildGrid(foods, 92);
+      const separationRadius = CONFIG.separationRadius * (hasMutation('wide_formation') ? 1 + CONFIG.controlFormationRadiusBonus : 1);
+      const separationForce = CONFIG.separationForce * (hasMutation('wide_formation') ? 1 + CONFIG.controlFormationForceBonus : 1);
+      const steering = CONFIG.steeringStrength
+        * lerp(1, 0.50, populationChaos)
+        * lerp(1, 0.79, clamp(timeChaos, 0, 1))
+        * (hasMutation('signal_boost') ? 1 + CONFIG.controlSignalSteeringBonus : 1);
+      const brakeDriftFactor = hasMutation('phase_brake') ? 1 - CONFIG.controlBrakeDriftReduction : 1;
+      const driftStrength = (CONFIG.randomDrift + CONFIG.chaosDrift * (populationChaos * 0.72 + timeChaos * 0.28)) * brakeDriftFactor;
+      const speedFactor = hasMutation('phase_brake') ? 1 - CONFIG.controlBrakeSpeedReduction : 1;
+
+      for (const creature of creatures) {
+        if (!creature.alive) continue;
+
+        let targetX = game.targetX - creature.x;
+        let targetY = game.targetY - creature.y;
+        let targetLength = Math.hypot(targetX, targetY) || 1;
+        targetX /= targetLength;
+        targetY /= targetLength;
+
+        const disobedienceFactor = hasMutation('signal_boost') ? 1 - CONFIG.controlSignalDisobedienceReduction : 1;
+        const disobedience = Math.sin(game.roundTime * 1.7 + creature.phase) * populationChaos * 0.46 * disobedienceFactor;
+        const cos = Math.cos(disobedience);
+        const sin = Math.sin(disobedience);
+        const rotatedX = targetX * cos - targetY * sin;
+        const rotatedY = targetX * sin + targetY * cos;
+        targetX = rotatedX;
+        targetY = rotatedY;
+
+        let foodPullX = 0;
+        let foodPullY = 0;
+        let closestFood = null;
+        let closestDistanceSq = CONFIG.foodAttractionRadius * CONFIG.foodAttractionRadius;
+        forNearby(foodGrid, creature.x, creature.y, 92, CONFIG.foodAttractionRadius, food => {
+          const dx = food.x - creature.x;
+          const dy = food.y - creature.y;
+          const distanceSq = dx * dx + dy * dy;
+          const weightedDistance = food.gold ? distanceSq * 0.82 : distanceSq;
+          if (weightedDistance < closestDistanceSq) {
+            closestDistanceSq = weightedDistance;
+            closestFood = food;
+          }
+        });
+        if (closestFood) {
+          const dx = closestFood.x - creature.x;
+          const dy = closestFood.y - creature.y;
+          const distance = Math.hypot(dx, dy) || 1;
+          const pull = CONFIG.foodAttractionForce * (closestFood.gold ? 1.35 : 1);
+          foodPullX = (dx / distance) * pull;
+          foodPullY = (dy / distance) * pull;
+        }
+
+        let holePullX = 0;
+        let holePullY = 0;
+        if (blackHole.active && population > CONFIG.blackHoleMinimumPopulation) {
+          const dx = blackHole.x - creature.x;
+          const dy = blackHole.y - creature.y;
+          const distance = Math.hypot(dx, dy) || 1;
+          if (distance < CONFIG.blackHoleSuctionRadius) {
+            const proximity = 1 - distance / CONFIG.blackHoleSuctionRadius;
+            let pull = CONFIG.blackHoleSuctionForce * proximity * proximity;
+            if (hasMutation('phase_brake')) pull *= 1 - CONFIG.controlBrakeSuctionReduction;
+            if (hasMutation('void_feast')) pull *= 1 + CONFIG.greedVoidSuctionBonus;
+            if (hasMutation('last_call') && blackHole.timeLeft <= CONFIG.greedLastCallWindow) {
+              pull *= 1 + CONFIG.greedLastCallSuctionBonus;
+            }
+            holePullX = (dx / distance) * pull;
+            holePullY = (dy / distance) * pull;
+          }
+        }
+
+        let separateX = 0;
+        let separateY = 0;
+        let neighbors = 0;
+        forNearby(creatureGrid, creature.x, creature.y, CONFIG.spatialCellSize, separationRadius, other => {
+          if (other === creature || other.alive === false) return;
+          const dx = creature.x - other.x;
+          const dy = creature.y - other.y;
+          const distanceSq = dx * dx + dy * dy;
+          if (distanceSq > 0.01 && distanceSq < separationRadius * separationRadius) {
+            const distance = Math.sqrt(distanceSq);
+            const force = (separationRadius - distance) / separationRadius;
+            separateX += (dx / distance) * force;
+            separateY += (dy / distance) * force;
+            neighbors++;
+          }
+        });
+        if (neighbors > 0) {
+          separateX = (separateX / neighbors) * separationForce;
+          separateY = (separateY / neighbors) * separationForce;
+        }
+
+        creature.wanderAngle += random(-1, 1) * dt * lerp(2.2, 5.1, clamp(game.difficulty, 0, 1));
+        const wanderX = Math.cos(creature.wanderAngle) * driftStrength;
+        const wanderY = Math.sin(creature.wanderAngle) * driftStrength;
+
+        let boundaryX = 0;
+        let boundaryY = 0;
+        const margin = CONFIG.boundaryMargin;
+        if (creature.x < margin) boundaryX += (margin - creature.x) / margin;
+        if (creature.x > width - margin) boundaryX -= (creature.x - (width - margin)) / margin;
+        if (creature.y < margin + 65) boundaryY += (margin + 65 - creature.y) / margin;
+        if (creature.y > height - margin) boundaryY -= (creature.y - (height - margin)) / margin;
+
+        let desiredX = targetX + foodPullX + holePullX + separateX + wanderX + boundaryX * 1.7;
+        let desiredY = targetY + foodPullY + holePullY + separateY + wanderY + boundaryY * 1.7;
+        const desiredLength = Math.hypot(desiredX, desiredY) || 1;
+        const speedVariation = lerp(0.93, CONFIG.maxSpeedFactor, populationChaos * 0.35) * creature.obedience;
+        const desiredSpeed = CONFIG.baseSpeed * speedVariation * speedFactor;
+        desiredX = (desiredX / desiredLength) * desiredSpeed;
+        desiredY = (desiredY / desiredLength) * desiredSpeed;
+
+        const response = clamp(steering * creature.obedience * dt, 0, 1);
+        creature.vx = lerp(creature.vx, desiredX, response);
+        creature.vy = lerp(creature.vy, desiredY, response);
+
+        const maxSpeed = CONFIG.baseSpeed * CONFIG.maxSpeedFactor * 1.16 * speedFactor;
+        const actualSpeed = Math.hypot(creature.vx, creature.vy);
+        if (actualSpeed > maxSpeed) {
+          creature.vx = (creature.vx / actualSpeed) * maxSpeed;
+          creature.vy = (creature.vy / actualSpeed) * maxSpeed;
+        }
+
+        creature.x += creature.vx * dt;
+        creature.y += creature.vy * dt;
+        creature.x = clamp(creature.x, 4, width - 4);
+        creature.y = clamp(creature.y, 86, height - 4);
+        creature.pulse = Math.max(0, creature.pulse - dt * 3.2);
+        creature.trailTimer -= dt;
+        if (creature.trailTimer <= 0 && (population < 70 || Math.random() < 0.28)) {
+          addTrail(creature);
+          creature.trailTimer = random(0.08, 0.20) * lerp(1, 2.8, populationChaos);
+        }
+      }
+
+      const refreshedFoodGrid = buildGrid(foods, 32);
+      for (const creature of creatures) {
+        if (!creature.alive) continue;
+        forNearby(refreshedFoodGrid, creature.x, creature.y, 32, 13, food => {
+          if (food.eaten) return;
+          const dx = food.x - creature.x;
+          const dy = food.y - creature.y;
+          const radius = creature.radius + food.radius + 1.5;
+          if (dx * dx + dy * dy <= radius * radius) eatFood(food, creature);
+        });
+      }
+
+      if (foods.some(food => food.eaten)) {
+        for (let i = foods.length - 1; i >= 0; i--) {
+          if (foods[i].eaten) foods.splice(i, 1);
+        }
+      }
+    }
+
+    function updateBlackHole(dt) {
+      if (!blackHole.active) {
+        if (core.active || game.ascensionStage >= ascensionTotal()) return;
+        blackHole.nextSpawn -= dt;
+        if (blackHole.nextSpawn <= 0) spawnBlackHole();
+        return;
+      }
+
+      blackHole.phase += dt * 3.2;
+      if (blackHole.successTimer > 0) {
+        blackHole.successTimer -= dt;
+        if (blackHole.successTimer <= 0) closeBlackHole(true);
+        return;
+      }
+      blackHole.timeLeft -= dt;
+      if (blackHole.timeLeft <= 0) {
+        closeBlackHole(false);
+        return;
+      }
+
+      let conversionCapacity = Math.min(
+        Math.max(0, creatures.length - CONFIG.blackHoleMinimumPopulation),
+        Math.max(0, blackHole.quota - blackHole.absorbed)
+      );
+      let converted = 0;
+      for (const creature of creatures) {
+        if (!creature.alive || conversionCapacity <= 0) continue;
+        const dx = creature.x - blackHole.x;
+        const dy = creature.y - blackHole.y;
+        const captureRadius = blackHole.radius + creature.radius * 0.55;
+        if (dx * dx + dy * dy < captureRadius * captureRadius) {
+          creature.alive = false;
+          creature.converted = true;
+          conversionCapacity--;
+          converted++;
+          blackHole.absorbed++;
+          addParticle(creature.x, creature.y, '#c584ff', 6, 62, 2.3);
+        }
+      }
+
+      if (converted > 0) {
+        const perCreature = blackHolePayoutPerCreature();
+        const payout = converted * perCreature;
+        game.score += payout;
+        records.bestScore = Math.max(records.bestScore, game.score);
+        addPopup(blackHole.x, blackHole.y - 42, `+${formatNumber(payout)} SCORE`, '#e2c4ff', 13 + Math.min(5, converted * 0.25), 1.05);
+        game.flash = Math.max(game.flash, 0.06);
+
+        for (let i = creatures.length - 1; i >= 0; i--) {
+          if (creatures[i].converted) creatures.splice(i, 1);
+        }
+
+        if (blackHole.absorbed >= blackHole.quota && blackHole.successTimer <= 0) {
+          blackHole.successTimer = CONFIG.blackHoleSuccessDelay;
+          showToast(`QUOTA FILLED · ASCENSION ${game.ascensionStage + 1}`);
+          addPopup(blackHole.x, blackHole.y - 58, 'QUOTA FILLED', '#f1d9ff', 16, 1.1);
+        }
+      }
+    }
+
+    function steerDanger(danger, dt, center, averageVx, averageVy, ramp, chaseRamp) {
+      danger.phase += dt * 1.7;
+      danger.turnPhase += dt * danger.speedFactor;
+
+      let desiredX = 0;
+      let desiredY = 0;
+      let speed = lerp(CONFIG.dangerSpeedStart, CONFIG.dangerSpeedEnd, ramp) * danger.speedFactor;
+
+      if (danger.type === 'wanderer') {
+        danger.wanderTimer -= dt;
+        if (danger.wanderTimer <= 0) {
+          danger.wanderTimer = random(1.2, 3.0);
+          danger.wanderAngle += random(-1.45, 1.45);
+        }
+        desiredX = Math.cos(danger.wanderAngle);
+        desiredY = Math.sin(danger.wanderAngle);
+        speed *= 1.12;
+      } else {
+        const predictedX = center.x + averageVx * CONFIG.dangerPredictionSeconds * chaseRamp;
+        const predictedY = center.y + averageVy * CONFIG.dangerPredictionSeconds * chaseRamp;
+        let dx = predictedX - danger.x;
+        let dy = predictedY - danger.y;
+        const distance = Math.hypot(dx, dy) || 1;
+        dx /= distance;
+        dy /= distance;
+        const orbitX = -dy * danger.orbitDirection;
+        const orbitY = dx * danger.orbitDirection;
+
+        if (danger.type === 'chaser') {
+          const proximityBoost = clamp(1 - distance / 240, 0, 1) * 0.14 * chaseRamp;
+          const chaseWeight = clamp(0.06 + chaseRamp * 0.76 + proximityBoost, 0.06, 0.94);
+          const wobble = Math.sin(danger.turnPhase) * lerp(0.42, 0.18, chaseRamp);
+          desiredX = dx * chaseWeight + orbitX * (1 - chaseWeight) + Math.cos(danger.turnPhase * 0.71) * wobble;
+          desiredY = dy * chaseWeight + orbitY * (1 - chaseWeight) + Math.sin(danger.turnPhase * 0.71) * wobble;
+        } else {
+          const preferred = CONFIG.shooterPreferredRange + (danger.type === 'laser' ? 35 : danger.type === 'toxic' ? -28 : 0);
+          const radial = distance > preferred + 55 ? 1 : distance < preferred - 55 ? -1 : 0;
+          desiredX = dx * radial * 0.82 + orbitX * 0.92 + Math.cos(danger.turnPhase) * 0.14;
+          desiredY = dy * radial * 0.82 + orbitY * 0.92 + Math.sin(danger.turnPhase) * 0.14;
+          speed *= danger.attackState === 'idle' ? 0.78 : 0.38;
+        }
+      }
+
+      if (danger.x < danger.radius + 48) desiredX += 1.4;
+      if (danger.x > width - danger.radius - 48) desiredX -= 1.4;
+      if (danger.y < danger.radius + 112) desiredY += 1.4;
+      if (danger.y > height - danger.radius - 48) desiredY -= 1.4;
+
+      const desiredLength = Math.hypot(desiredX, desiredY) || 1;
+      desiredX = (desiredX / desiredLength) * speed;
+      desiredY = (desiredY / desiredLength) * speed;
+      const response = 1 - Math.exp(-CONFIG.dangerSteering * dt);
+      danger.vx = lerp(danger.vx, desiredX, response);
+      danger.vy = lerp(danger.vy, desiredY, response);
+      danger.x += danger.vx * dt;
+      danger.y += danger.vy * dt;
+
+      if (danger.x < danger.radius + 20 || danger.x > width - danger.radius - 20) danger.vx *= -1;
+      if (danger.y < danger.radius + 92 || danger.y > height - danger.radius - 20) danger.vy *= -1;
+      danger.x = clamp(danger.x, danger.radius + 20, width - danger.radius - 20);
+      danger.y = clamp(danger.y, danger.radius + 92, height - danger.radius - 20);
+    }
+
+    function startLaserCharge(danger, targetX, targetY) {
+      danger.aimAngle = Math.atan2(targetY - danger.y, targetX - danger.x);
+      danger.attackState = 'telegraph';
+      danger.attackTimer = CONFIG.laserTelegraphDuration;
+      addPopup(danger.x, danger.y - danger.radius - 17, 'LASER LOCK', '#ff8cc8', 9, 0.8);
+    }
+
+    function fireLaser(danger) {
+      const aimX = Math.cos(danger.aimAngle);
+      const aimY = Math.sin(danger.aimAngle);
+      const maxDistance = Math.hypot(width, height) * 1.5;
+      for (const creature of creatures) {
+        if (!creature.alive) continue;
+        const relX = creature.x - danger.x;
+        const relY = creature.y - danger.y;
+        const along = relX * aimX + relY * aimY;
+        const perpendicular = Math.abs(relX * -aimY + relY * aimX);
+        if (along > danger.radius * 0.5 && along < maxDistance && perpendicular <= CONFIG.laserWidth + creature.radius * 0.55) {
+          killCreature(creature, 'laser');
+        }
+      }
+      for (const target of dangers) {
+        if (!target.alive || target.id === danger.id) continue;
+        const relX = target.x - danger.x;
+        const relY = target.y - danger.y;
+        const along = relX * aimX + relY * aimY;
+        const perpendicular = Math.abs(relX * -aimY + relY * aimX);
+        if (along > danger.radius * 0.5 && along < maxDistance && perpendicular <= CONFIG.laserWidth + target.radius * 0.65) {
+          killDanger(target, 'laser');
+        }
+      }
+      if (core.active) {
+        const relX = core.x - danger.x;
+        const relY = core.y - danger.y;
+        const along = relX * aimX + relY * aimY;
+        const perpendicular = Math.abs(relX * -aimY + relY * aimX);
+        if (along > danger.radius * 0.5 && along < maxDistance && perpendicular <= CONFIG.laserWidth + core.radius * 0.82) {
+          damageCore(CONFIG.coreLaserDamage, 'laser');
+        }
+      }
+      addParticle(danger.x, danger.y, '#ff5caf', 18, 120, 2.5);
+      addPopup(danger.x, danger.y - danger.radius - 17, 'LASER!', '#ffb0da', 11, 0.7);
+    }
+
+    function launchProjectile(danger, type, targetX, targetY) {
+      let dx = targetX - danger.x;
+      let dy = targetY - danger.y;
+      const distance = Math.hypot(dx, dy) || 1;
+      dx /= distance;
+      dy /= distance;
+      const speed = type === 'bomb' ? CONFIG.bombSpeed : CONFIG.toxicShotSpeed;
+      const offset = danger.radius + 8;
+      projectiles.push({
+        id: nextId++,
+        type,
+        x: danger.x + dx * offset,
+        y: danger.y + dy * offset,
+        vx: dx * speed,
+        vy: dy * speed,
+        radius: type === 'bomb' ? 6 : 4,
+        life: Math.min(CONFIG.projectileMaxLife, distance / speed + (type === 'bomb' ? 0.18 : 1.1)),
+        targetX,
+        targetY,
+        phase: random(0, TAU),
+        sourceId: danger.id
+      });
+      addPopup(danger.x, danger.y - danger.radius - 16, type === 'bomb' ? 'BOMB!' : 'TOXIN!', type === 'bomb' ? '#ffb45c' : '#b8ff55', 9, 0.7);
+    }
+
+    function updateDangerAttack(danger, dt, predictedX, predictedY) {
+      if (danger.type === 'laser') {
+        if (danger.attackState === 'telegraph') {
+          danger.attackTimer -= dt;
+          if (danger.attackTimer <= 0) {
+            danger.attackState = 'fire';
+            danger.attackTimer = CONFIG.laserActiveDuration;
+            fireLaser(danger);
+          }
+        } else if (danger.attackState === 'fire') {
+          danger.attackTimer -= dt;
+          if (danger.attackTimer <= 0) {
+            danger.attackState = 'idle';
+            danger.cooldown = enemyAttackCooldown(CONFIG.laserCooldownMin, CONFIG.laserCooldownMax);
+          }
+        } else {
+          danger.cooldown -= dt;
+          if (danger.cooldown <= 0) startLaserCharge(danger, predictedX, predictedY);
+        }
+        return;
+      }
+
+      if (danger.type !== 'bomber' && danger.type !== 'toxic') return;
+      danger.cooldown -= dt;
+      if (danger.cooldown > 0) return;
+      if (danger.type === 'bomber') {
+        launchProjectile(danger, 'bomb', predictedX, predictedY);
+        danger.cooldown = enemyAttackCooldown(CONFIG.bombCooldownMin, CONFIG.bombCooldownMax);
+      } else {
+        launchProjectile(danger, 'toxic', predictedX, predictedY);
+        danger.cooldown = enemyAttackCooldown(CONFIG.toxicCooldownMin, CONFIG.toxicCooldownMax);
+      }
+    }
+
+    function updateDangers(dt) {
+      const center = swarmCenter();
+      let averageVx = 0;
+      let averageVy = 0;
+      for (const creature of creatures) {
+        averageVx += creature.vx;
+        averageVy += creature.vy;
+      }
+      if (creatures.length > 0) {
+        averageVx /= creatures.length;
+        averageVy /= creatures.length;
+      }
+
+      const ramp = clamp(game.roundTime / CONFIG.difficultyRampSeconds, 0, 1);
+      const chaseRamp = clamp((game.roundTime - CONFIG.dangerChaseDelay) / 58, 0, 1);
+      const predictedX = center.x + averageVx * CONFIG.dangerPredictionSeconds;
+      const predictedY = center.y + averageVy * CONFIG.dangerPredictionSeconds;
+
+      for (const danger of dangers) {
+        if (!danger.alive) continue;
+        steerDanger(danger, dt, center, averageVx, averageVy, ramp, chaseRamp);
+        updateDangerAttack(danger, dt, predictedX, predictedY);
+      }
+
+      for (const creature of creatures) {
+        if (!creature.alive) continue;
+        for (const danger of dangers) {
+          if (!danger.alive) continue;
+          const dx = creature.x - danger.x;
+          const dy = creature.y - danger.y;
+          const lethalRadius = danger.radius + creature.radius * 0.45;
+          if (dx * dx + dy * dy < lethalRadius * lethalRadius) {
+            killCreature(creature, 'collision');
+            break;
+          }
+        }
+      }
+
+      const removed = removeDeadCreatures();
+      removeDeadDangers();
+      if (removed > 0) {
+        const center = swarmCenter();
+        addPopup(center.x, center.y - 22, `-${removed} LOST`, '#ff7183', 12 + Math.min(6, removed * 0.18), 0.9);
+      }
+    }
+
+    function explodeBomb(projectile) {
+      let killed = 0;
+      let enemyKills = 0;
+      let coreHit = false;
+      for (const creature of creatures) {
+        if (!creature.alive) continue;
+        const dx = creature.x - projectile.x;
+        const dy = creature.y - projectile.y;
+        if (dx * dx + dy * dy <= CONFIG.bombSplashRadius * CONFIG.bombSplashRadius) {
+          killCreature(creature, 'bomb');
+          killed++;
+        }
+      }
+      for (const danger of dangers) {
+        if (!danger.alive) continue;
+        const dx = danger.x - projectile.x;
+        const dy = danger.y - projectile.y;
+        const radius = CONFIG.bombSplashRadius + danger.radius * 0.35;
+        if (dx * dx + dy * dy <= radius * radius && killDanger(danger, 'bomb')) enemyKills++;
+      }
+      if (core.active) {
+        const dx = core.x - projectile.x;
+        const dy = core.y - projectile.y;
+        const radius = CONFIG.bombSplashRadius + core.radius * 0.55;
+        if (dx * dx + dy * dy <= radius * radius) coreHit = damageCore(CONFIG.coreBombDamage, 'bomb');
+      }
+      addParticle(projectile.x, projectile.y, '#ff9f45', 34, 155, 3.4);
+      const result = killed > 0 || enemyKills > 0 || coreHit ? `BOMB · -${killed} SWARM · ${enemyKills} FOE${coreHit ? ' · CORE HIT' : ''}` : 'BOMB';
+      addPopup(projectile.x, projectile.y - 25, result, '#ffc07c', 13, 0.9);
+      removeDeadCreatures();
+      removeDeadDangers();
+    }
+
+    function infectCreature(creature, projectile) {
+      if (creature.poisonTimer <= 0) {
+        creature.poisonTimer = CONFIG.toxicDuration;
+        creature.poisonMax = CONFIG.toxicDuration;
+        addPopup(creature.x, creature.y - 20, 'INFECTED · CLICK TO CULL', '#caff69', 9, 1.3);
+      }
+      addParticle(projectile.x, projectile.y, '#a8ff52', 12, 82, 2.4);
+    }
+
+    function infectDanger(danger, projectile) {
+      if (danger.poisonTimer <= 0) {
+        danger.poisonTimer = CONFIG.toxicDuration;
+        danger.poisonMax = CONFIG.toxicDuration;
+        addPopup(danger.x, danger.y - danger.radius - 18, 'ENEMY INFECTED', '#d5ff82', 9, 1.2);
+      }
+      addParticle(projectile.x, projectile.y, '#a8ff52', 12, 82, 2.4);
+    }
+
+    function updateProjectiles(dt) {
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const projectile = projectiles[i];
+        projectile.phase += dt * 7;
+        projectile.life -= dt;
+        projectile.x += projectile.vx * dt;
+        projectile.y += projectile.vy * dt;
+
+        let hitCreature = null;
+        for (const creature of creatures) {
+          if (!creature.alive) continue;
+          const dx = creature.x - projectile.x;
+          const dy = creature.y - projectile.y;
+          const radius = creature.radius + projectile.radius + 2;
+          if (dx * dx + dy * dy <= radius * radius) {
+            hitCreature = creature;
+            break;
+          }
+        }
+
+        let hitDanger = null;
+        for (const danger of dangers) {
+          if (!danger.alive || danger.id === projectile.sourceId) continue;
+          const dx = danger.x - projectile.x;
+          const dy = danger.y - projectile.y;
+          const radius = danger.radius + projectile.radius;
+          if (dx * dx + dy * dy <= radius * radius) {
+            hitDanger = danger;
+            break;
+          }
+        }
+
+        let hitCore = false;
+        if (core.active) {
+          const dx = core.x - projectile.x;
+          const dy = core.y - projectile.y;
+          const radius = core.radius + projectile.radius;
+          hitCore = dx * dx + dy * dy <= radius * radius;
+        }
+
+        const outside = projectile.x < -30 || projectile.x > width + 30 || projectile.y < 60 || projectile.y > height + 30;
+        if (projectile.type === 'bomb' && (hitCreature || hitDanger || hitCore || projectile.life <= 0)) {
+          explodeBomb(projectile);
+          projectiles.splice(i, 1);
+        } else if (projectile.type === 'toxic' && (hitCreature || hitDanger || hitCore)) {
+          if (hitCreature) infectCreature(hitCreature, projectile);
+          else if (hitDanger) infectDanger(hitDanger, projectile);
+          else {
+            damageCore(CONFIG.coreToxicImpactDamage, 'toxic');
+            addParticle(projectile.x, projectile.y, '#a8ff52', 14, 90, 2.6);
+          }
+          projectiles.splice(i, 1);
+        } else if (projectile.life <= 0 || outside) {
+          projectiles.splice(i, 1);
+        }
+        if (game.mode !== 'playing') return;
+      }
+    }
+
+    function updatePoison(dt) {
+      const bursts = [];
+      for (const creature of creatures) {
+        if (!creature.alive || creature.poisonTimer <= 0) continue;
+        creature.poisonTimer -= dt;
+        if (creature.poisonTimer <= 0) bursts.push({ x: creature.x, y: creature.y, source: creature, sourceType: 'creature' });
+      }
+      for (const danger of dangers) {
+        if (!danger.alive || danger.poisonTimer <= 0) continue;
+        danger.poisonTimer -= dt;
+        if (danger.poisonTimer <= 0) bursts.push({ x: danger.x, y: danger.y, source: danger, sourceType: 'danger' });
+      }
+
+      for (const burst of bursts) {
+        if (!burst.source.alive) continue;
+        let killed = 0;
+        let enemyKills = 0;
+        for (const creature of creatures) {
+          if (!creature.alive) continue;
+          const dx = creature.x - burst.x;
+          const dy = creature.y - burst.y;
+          if (dx * dx + dy * dy <= CONFIG.toxicSplashRadius * CONFIG.toxicSplashRadius) {
+            killCreature(creature, 'toxic');
+            killed++;
+          }
+        }
+        for (const danger of dangers) {
+          if (!danger.alive) continue;
+          const dx = danger.x - burst.x;
+          const dy = danger.y - burst.y;
+          const radius = CONFIG.toxicSplashRadius + danger.radius * 0.28;
+          if (dx * dx + dy * dy <= radius * radius && killDanger(danger, 'toxic')) enemyKills++;
+        }
+        if (core.active) {
+          const dx = core.x - burst.x;
+          const dy = core.y - burst.y;
+          const radius = CONFIG.toxicSplashRadius + core.radius * 0.55;
+          if (dx * dx + dy * dy <= radius * radius) damageCore(CONFIG.coreToxicBurstDamage, 'toxic');
+        }
+        addParticle(burst.x, burst.y, '#a8ff45', 38, 145, 3.1);
+        addPopup(burst.x, burst.y - 26, `TOXIC BURST · -${killed} SWARM · ${enemyKills} FOE`, '#ceff77', 12, 1.0);
+      }
+
+      if (bursts.length > 0) {
+        removeDeadCreatures();
+        removeDeadDangers();
+      }
+    }
+
+    function updateSpawning(dt) {
+      const rate = CONFIG.foodSpawnRate * lerp(1, 1.15, clamp(game.difficulty, 0, 1));
+      game.foodSpawnAccumulator += dt * rate;
+      while (game.foodSpawnAccumulator >= 1) {
+        game.foodSpawnAccumulator -= 1;
+        spawnFood();
+      }
+
+      game.dangerSpawnTimer -= dt;
+      if (game.dangerSpawnTimer <= 0 && dangers.length < CONFIG.maxDangerCount) {
+        const danger = createDanger(false);
+        game.dangerSpawnCount++;
+        const ramp = clamp(game.roundTime / CONFIG.difficultyRampSeconds, 0, 1);
+        const pressureIndex = Math.min(game.ascensionStage, CONFIG.ascensionSpawnMultipliers.length - 1);
+        game.dangerSpawnTimer = lerp(CONFIG.dangerSpawnIntervalStart, CONFIG.dangerSpawnIntervalEnd, ramp)
+          * CONFIG.ascensionSpawnMultipliers[pressureIndex];
+        showToast(`${danger.type.toUpperCase()} ENTERED`);
+      }
+    }
+
+    function updateEffects(dt) {
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const particle = particles[i];
+        particle.life -= dt;
+        if (particle.life <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        particle.x += particle.vx * dt;
+        particle.y += particle.vy * dt;
+        particle.vx *= Math.pow(0.15, dt);
+        particle.vy *= Math.pow(0.15, dt);
+      }
+
+      for (let i = popups.length - 1; i >= 0; i--) {
+        const popup = popups[i];
+        popup.life -= dt;
+        if (popup.life <= 0) {
+          popups.splice(i, 1);
+          continue;
+        }
+        popup.y += popup.vy * dt;
+        popup.vy *= Math.pow(0.3, dt);
+      }
+
+      game.comboTimer = Math.max(0, game.comboTimer - dt);
+      game.flash = Math.max(0, game.flash - dt * 0.9);
+      game.dangerFlash = Math.max(0, game.dangerFlash - dt * 0.72);
+      if (toastTimer > 0) {
+        toastTimer -= dt;
+        if (toastTimer <= 0) ui.toast.classList.remove('show');
+      }
+    }
+
+    function update(dt) {
+      updateEffects(dt);
+      if (game.mode !== 'playing') return;
+
+      game.roundTime += dt;
+      game.totalTime += dt;
+      game.introTimer -= dt;
+      if (game.introTimer <= 0) ui.intro.classList.add('hidden');
+      updateCreatures(dt);
+      if (game.mode !== 'playing') return;
+      updateBlackHole(dt);
+      if (game.mode !== 'playing') return;
+      updateCore(dt);
+      if (game.mode !== 'playing') return;
+      updateDangers(dt);
+      if (game.mode !== 'playing') return;
+      updateProjectiles(dt);
+      if (game.mode !== 'playing') return;
+      updatePoison(dt);
+      if (game.mode !== 'playing') return;
+      updateSpawning(dt);
+    }
+
+    function drawBackground() {
+      ctx.fillStyle = '#070a10';
+      ctx.fillRect(0, 0, width, height);
+
+      const gradient = ctx.createRadialGradient(game.targetX, game.targetY, 0, game.targetX, game.targetY, Math.max(width, height) * 0.62);
+      gradient.addColorStop(0, 'rgba(22, 58, 61, 0.11)');
+      gradient.addColorStop(0.48, 'rgba(10, 23, 31, 0.045)');
+      gradient.addColorStop(1, 'rgba(2, 4, 8, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    function drawTarget() {
+      if (game.mode !== 'playing') return;
+      const x = game.targetX;
+      const y = game.targetY;
+      const pulse = 1 + Math.sin(game.roundTime * 5) * 0.10;
+      ctx.save();
+
+      ctx.strokeStyle = 'rgba(0, 5, 12, 0.92)';
+      ctx.lineWidth = 5.5;
+      ctx.beginPath();
+      ctx.arc(x, y, 13 * pulse, 0, TAU);
+      ctx.moveTo(x - 22, y);
+      ctx.lineTo(x - 8, y);
+      ctx.moveTo(x + 8, y);
+      ctx.lineTo(x + 22, y);
+      ctx.moveTo(x, y - 22);
+      ctx.lineTo(x, y - 8);
+      ctx.moveTo(x, y + 8);
+      ctx.lineTo(x, y + 22);
+      ctx.stroke();
+
+      ctx.shadowColor = '#55d8ff';
+      ctx.shadowBlur = 13;
+      ctx.strokeStyle = 'rgba(238, 252, 255, 0.98)';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(x, y, 13 * pulse, 0, TAU);
+      ctx.moveTo(x - 22, y);
+      ctx.lineTo(x - 8, y);
+      ctx.moveTo(x + 8, y);
+      ctx.lineTo(x + 22, y);
+      ctx.moveTo(x, y - 22);
+      ctx.lineTo(x, y - 8);
+      ctx.moveTo(x, y + 8);
+      ctx.lineTo(x, y + 22);
+      ctx.stroke();
+
+      ctx.fillStyle = '#55d8ff';
+      ctx.beginPath();
+      ctx.arc(x, y, 3.4, 0, TAU);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < 2; i++) {
+        const angle = game.roundTime * 2.6 + i * Math.PI;
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(angle) * 17, y + Math.sin(angle) * 17, 1.8, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawCore() {
+      if (!core.active) return;
+      const pulse = Math.sin(core.phase * 2.7) * 3;
+      const healthRatio = clamp(core.health / core.maxHealth, 0, 1);
+      const timeRatio = clamp(core.timeLeft / CONFIG.coreDuration, 0, 1);
+
+      ctx.save();
+      ctx.translate(core.x, core.y);
+
+      const glow = ctx.createRadialGradient(0, 0, 8, 0, 0, core.radius + 62);
+      glow.addColorStop(0, `rgba(255, 214, 226, ${0.17 + core.hitFlash * 0.24})`);
+      glow.addColorStop(0.28, 'rgba(255, 45, 91, 0.34)');
+      glow.addColorStop(0.68, 'rgba(123, 20, 63, 0.14)');
+      glow.addColorStop(1, 'rgba(123, 20, 63, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, 0, core.radius + 62, 0, TAU);
+      ctx.fill();
+
+      ctx.rotate(core.phase * 0.22);
+      ctx.strokeStyle = 'rgba(255, 81, 122, 0.88)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([16, 8, 3, 8]);
+      ctx.beginPath();
+      ctx.arc(0, 0, core.radius + 14 + pulse, 0, TAU);
+      ctx.stroke();
+
+      ctx.rotate(-core.phase * 0.48);
+      ctx.strokeStyle = 'rgba(255, 154, 184, 0.55)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 7]);
+      ctx.beginPath();
+      ctx.arc(0, 0, core.radius + 25 - pulse * 0.4, 0, TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = core.hitFlash > 0 ? '#7d1838' : '#260812';
+      ctx.beginPath();
+      ctx.arc(0, 0, core.radius + pulse * 0.22, 0, TAU);
+      ctx.fill();
+
+      ctx.strokeStyle = '#ff668e';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, core.radius - 7, 0, TAU);
+      ctx.stroke();
+
+      for (let i = 0; i < 3; i++) {
+        const angle = core.phase * 0.7 + i * TAU / 3;
+        ctx.fillStyle = i === 0 ? '#ffe0e9' : '#ff4f7c';
+        ctx.beginPath();
+        ctx.arc(Math.cos(angle) * 19, Math.sin(angle) * 19, i === 0 ? 5 : 7, 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#12020a';
+      ctx.shadowBlur = 7;
+      ctx.fillStyle = '#ffd8e3';
+      ctx.font = '900 13px Inter, ui-sans-serif, system-ui, sans-serif';
+      ctx.fillText(`THE CORE · ${core.health} / ${core.maxHealth}`, core.x, core.y - core.radius - 42);
+      ctx.fillStyle = core.timeLeft <= 10 ? '#ff6c87' : 'rgba(255, 185, 204, 0.82)';
+      ctx.font = '800 9px Inter, ui-sans-serif, system-ui, sans-serif';
+      ctx.fillText(`BAIT ENEMY FIRE · ${Math.ceil(core.timeLeft)}s`, core.x, core.y - core.radius - 26);
+
+      ctx.fillStyle = 'rgba(255, 60, 104, 0.24)';
+      ctx.fillRect(core.x - 60, core.y + core.radius + 18, 120, 5);
+      ctx.fillStyle = '#ff5d83';
+      ctx.fillRect(core.x - 60, core.y + core.radius + 18, 120 * healthRatio, 5);
+      ctx.fillStyle = 'rgba(255, 207, 220, 0.72)';
+      ctx.fillRect(core.x - 60, core.y + core.radius + 27, 120 * timeRatio, 2);
+      ctx.restore();
+    }
+
+    function drawDangers() {
+      for (const danger of dangers) {
+        if (!danger.alive) continue;
+        const pulse = Math.sin(danger.phase * 2.2) * 2.2;
+        const style = {
+          chaser: { color: '#ff526d', fill: 'rgba(255, 44, 69, 0.18)', label: 'HUNTER' },
+          wanderer: { color: '#ff8b55', fill: 'rgba(255, 110, 60, 0.17)', label: 'ROAMER' },
+          laser: { color: '#ff55b5', fill: 'rgba(255, 53, 160, 0.17)', label: 'LASER' },
+          bomber: { color: '#ffb34e', fill: 'rgba(255, 151, 46, 0.17)', label: 'BOMBER' },
+          toxic: { color: '#aaff52', fill: 'rgba(125, 214, 46, 0.15)', label: 'TOXIN' }
+        }[danger.type];
+
+        if (danger.type === 'laser' && (danger.attackState === 'telegraph' || danger.attackState === 'fire')) {
+          const endX = danger.x + Math.cos(danger.aimAngle) * Math.hypot(width, height) * 1.5;
+          const endY = danger.y + Math.sin(danger.aimAngle) * Math.hypot(width, height) * 1.5;
+          ctx.save();
+          if (danger.attackState === 'telegraph') {
+            const charge = 1 - clamp(danger.attackTimer / CONFIG.laserTelegraphDuration, 0, 1);
+            ctx.strokeStyle = `rgba(255, 86, 178, ${0.25 + charge * 0.5})`;
+            ctx.lineWidth = 1.2 + charge * 1.4;
+            ctx.setLineDash([8, 7]);
+            ctx.lineDashOffset = -game.roundTime * 30;
+          } else {
+            ctx.shadowColor = '#ff4faf';
+            ctx.shadowBlur = 18;
+            ctx.strokeStyle = 'rgba(255, 225, 244, 0.96)';
+            ctx.lineWidth = CONFIG.laserWidth * 2;
+          }
+          ctx.beginPath();
+          ctx.moveTo(danger.x, danger.y);
+          ctx.lineTo(endX, endY);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        ctx.save();
+        ctx.translate(danger.x, danger.y);
+
+        ctx.fillStyle = style.fill;
+        ctx.beginPath();
+        ctx.arc(0, 0, danger.radius + 12 + pulse, 0, TAU);
+        ctx.fill();
+
+        ctx.fillStyle = style.fill;
+        ctx.beginPath();
+        ctx.arc(0, 0, danger.radius, 0, TAU);
+        ctx.fill();
+
+        ctx.strokeStyle = style.color;
+        ctx.lineWidth = 1.6;
+        ctx.setLineDash([5, 5]);
+        ctx.lineDashOffset = -danger.phase * 5;
+        ctx.beginPath();
+        ctx.arc(0, 0, danger.radius + pulse * 0.35, 0, TAU);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = style.color;
+        ctx.strokeStyle = style.color;
+        ctx.lineWidth = 2;
+
+        if (danger.type === 'chaser') {
+          ctx.rotate(Math.atan2(danger.vy, danger.vx) + Math.PI / 2);
+          ctx.beginPath();
+          ctx.moveTo(0, -9);
+          ctx.lineTo(7, 6);
+          ctx.lineTo(-7, 6);
+          ctx.closePath();
+          ctx.fill();
+        } else if (danger.type === 'wanderer') {
+          ctx.rotate(danger.phase * 0.4);
+          for (let i = 0; i < 4; i++) {
+            ctx.beginPath();
+            ctx.arc(Math.cos(i * Math.PI / 2) * 8, Math.sin(i * Math.PI / 2) * 8, 3, 0, TAU);
+            ctx.fill();
+          }
+        } else if (danger.type === 'laser') {
+          ctx.rotate(danger.aimAngle);
+          ctx.fillRect(-9, -3, 18, 6);
+          ctx.fillStyle = '#fff0f8';
+          ctx.fillRect(4, -1.5, 9, 3);
+        } else if (danger.type === 'bomber') {
+          ctx.beginPath();
+          ctx.arc(0, 2, 7, 0, TAU);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(5, -6, 2.2, 0, TAU);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.moveTo(3, -4);
+          ctx.quadraticCurveTo(7, -10, 10, -7);
+          ctx.stroke();
+        } else {
+          for (let i = 0; i < 3; i++) {
+            const angle = danger.phase * 0.22 + i * TAU / 3;
+            ctx.beginPath();
+            ctx.arc(Math.cos(angle) * 6, Math.sin(angle) * 6, 4, 0, TAU);
+            ctx.fill();
+          }
+          ctx.fillStyle = '#101709';
+          ctx.beginPath();
+          ctx.arc(0, 0, 3, 0, TAU);
+          ctx.fill();
+        }
+        ctx.restore();
+
+        if (danger.poisonTimer > 0) {
+          const progress = clamp(danger.poisonTimer / danger.poisonMax, 0, 1);
+          ctx.save();
+          ctx.strokeStyle = progress < 0.3 ? '#fff06b' : '#b8ff55';
+          ctx.shadowColor = '#98ff3f';
+          ctx.shadowBlur = 9;
+          ctx.lineWidth = 2.4;
+          ctx.beginPath();
+          ctx.arc(danger.x, danger.y, danger.radius + 7, -Math.PI / 2, -Math.PI / 2 + TAU * progress);
+          ctx.stroke();
+          ctx.fillStyle = '#efffcf';
+          ctx.font = '900 9px ui-monospace, SFMono-Regular, Menlo, monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(String(Math.max(1, Math.ceil(danger.poisonTimer))), danger.x, danger.y + 3);
+          ctx.restore();
+        }
+
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = style.color;
+        ctx.font = '800 8px Inter, ui-sans-serif, system-ui, sans-serif';
+        ctx.fillText(style.label, danger.x, danger.y - danger.radius - 10);
+        ctx.restore();
+      }
+    }
+
+    function drawProjectiles() {
+      for (const projectile of projectiles) {
+        ctx.save();
+        if (projectile.type === 'bomb') {
+          ctx.strokeStyle = 'rgba(255, 177, 72, 0.42)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([4, 6]);
+          ctx.beginPath();
+          ctx.arc(projectile.targetX, projectile.targetY, CONFIG.bombSplashRadius, 0, TAU);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.shadowColor = '#ff9f42';
+          ctx.shadowBlur = 13;
+          ctx.fillStyle = '#ffb24f';
+          ctx.beginPath();
+          ctx.arc(projectile.x, projectile.y, projectile.radius + Math.sin(projectile.phase) * 0.8, 0, TAU);
+          ctx.fill();
+          ctx.strokeStyle = '#fff0c9';
+          ctx.beginPath();
+          ctx.moveTo(projectile.x, projectile.y);
+          ctx.lineTo(projectile.x - projectile.vx * 0.07, projectile.y - projectile.vy * 0.07);
+          ctx.stroke();
+        } else {
+          const angle = Math.atan2(projectile.vy, projectile.vx);
+          ctx.translate(projectile.x, projectile.y);
+          ctx.rotate(angle);
+          ctx.shadowColor = '#a7ff4f';
+          ctx.shadowBlur = 12;
+          ctx.fillStyle = '#bdff61';
+          ctx.beginPath();
+          ctx.moveTo(8, 0);
+          ctx.lineTo(-5, 4);
+          ctx.lineTo(-2, 0);
+          ctx.lineTo(-5, -4);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+    }
+
+    function drawBlackHole() {
+      if (!blackHole.active) return;
+      const x = blackHole.x;
+      const y = blackHole.y;
+      const pulse = Math.sin(blackHole.phase * 1.7) * 2;
+      const remaining = clamp(blackHole.timeLeft / blackHole.duration, 0, 1);
+      const quotaProgress = clamp(blackHole.absorbed / blackHole.quota, 0, 1);
+      const payout = blackHolePayoutPerCreature();
+      const lastCallActive = hasMutation('last_call') && blackHole.timeLeft <= CONFIG.greedLastCallWindow;
+
+      ctx.save();
+      ctx.translate(x, y);
+
+      const glow = ctx.createRadialGradient(0, 0, 5, 0, 0, blackHole.radius + 34);
+      glow.addColorStop(0, 'rgba(4, 0, 10, 0.98)');
+      glow.addColorStop(0.42, 'rgba(72, 27, 122, 0.48)');
+      glow.addColorStop(0.72, 'rgba(170, 91, 255, 0.18)');
+      glow.addColorStop(1, 'rgba(170, 91, 255, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(0, 0, blackHole.radius + 34, 0, TAU);
+      ctx.fill();
+
+      ctx.rotate(blackHole.phase * 0.24);
+      ctx.strokeStyle = 'rgba(200, 133, 255, 0.92)';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([3, 8]);
+      ctx.beginPath();
+      ctx.arc(0, 0, blackHole.radius + 9 + pulse, 0, TAU);
+      ctx.stroke();
+
+      ctx.rotate(-blackHole.phase * 0.53);
+      ctx.strokeStyle = 'rgba(119, 70, 255, 0.72)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([11, 7]);
+      ctx.beginPath();
+      ctx.arc(0, 0, blackHole.radius + 17 - pulse * 0.4, 0, TAU);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#020106';
+      ctx.beginPath();
+      ctx.arc(0, 0, blackHole.radius + pulse * 0.22, 0, TAU);
+      ctx.fill();
+
+      ctx.strokeStyle = 'rgba(229, 192, 255, 0.88)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, blackHole.radius - 5, 0, TAU);
+      ctx.stroke();
+
+      ctx.rotate(blackHole.phase * 0.68);
+      ctx.strokeStyle = 'rgba(176, 106, 255, 0.88)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, 14, 0.3, Math.PI * 1.55);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(0, 0, 8, 2.2, Math.PI * 1.95);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = '#05010a';
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = '#ead7ff';
+      ctx.font = '900 11px Inter, ui-sans-serif, system-ui, sans-serif';
+      const quotaLabel = blackHole.successTimer > 0
+        ? 'QUOTA FILLED'
+        : lastCallActive
+          ? `LAST CALL x${CONFIG.greedLastCallScoreMultiplier} · ${Math.ceil(blackHole.timeLeft)}s`
+          : `ASCEND · ${blackHole.absorbed} / ${blackHole.quota} · ${Math.ceil(blackHole.timeLeft)}s`;
+      ctx.fillText(quotaLabel, x, y - blackHole.radius - 30);
+      ctx.fillStyle = 'rgba(211, 172, 255, 0.88)';
+      ctx.font = '800 9px Inter, ui-sans-serif, system-ui, sans-serif';
+      ctx.fillText(`+${payout} SCORE / POP`, x, y - blackHole.radius - 15);
+
+      ctx.fillStyle = 'rgba(199, 133, 255, 0.7)';
+      ctx.fillRect(x - 32, y + blackHole.radius + 14, 64 * quotaProgress, 4);
+      ctx.strokeStyle = 'rgba(199, 133, 255, 0.28)';
+      ctx.strokeRect(x - 32, y + blackHole.radius + 14, 64, 4);
+      ctx.fillStyle = 'rgba(229, 198, 255, 0.66)';
+      ctx.fillRect(x - 32, y + blackHole.radius + 21, 64 * remaining, 2);
+      ctx.restore();
+    }
+
+    function drawFoods() {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const food of foods) {
+        const pulse = 1 + Math.sin(game.roundTime * 4 + food.phase) * 0.18;
+        if (food.gold) {
+          ctx.fillStyle = 'rgba(255, 208, 54, 0.11)';
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, 15 * pulse, 0, TAU);
+          ctx.fill();
+
+          ctx.strokeStyle = 'rgba(255, 224, 104, 0.65)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, 10 * pulse, 0, TAU);
+          ctx.stroke();
+
+          ctx.save();
+          ctx.translate(food.x, food.y);
+          ctx.rotate(game.roundTime * 0.7 + food.phase);
+          ctx.fillStyle = '#ffd95a';
+          ctx.beginPath();
+          ctx.moveTo(0, -food.radius);
+          ctx.lineTo(food.radius, 0);
+          ctx.lineTo(0, food.radius);
+          ctx.lineTo(-food.radius, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        } else {
+          ctx.fillStyle = 'rgba(119, 255, 94, 0.20)';
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, food.radius * 2.5 * pulse, 0, TAU);
+          ctx.fill();
+          ctx.fillStyle = '#82ff5d';
+          ctx.beginPath();
+          ctx.arc(food.x, food.y, food.radius * pulse, 0, TAU);
+          ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
+    function drawParticles() {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      for (const particle of particles) {
+        const alpha = clamp(particle.life / particle.maxLife, 0, 1);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = particle.color;
+        ctx.beginPath();
+        ctx.arc(particle.x, particle.y, particle.size * (0.55 + alpha * 0.45), 0, TAU);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function drawCreatures() {
+      const chaos = clamp(Math.log2(Math.max(1, creatures.length)) / Math.log2(CONFIG.maxPopulation), 0, 1);
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      for (const creature of creatures) {
+        const speed = Math.hypot(creature.vx, creature.vy) || 1;
+        const tail = lerp(5, 9, chaos);
+        ctx.strokeStyle = `rgba(86, 182, 255, ${lerp(0.22, 0.09, chaos)})`;
+        ctx.lineWidth = Math.max(1, creature.radius * 0.58);
+        ctx.beginPath();
+        ctx.moveTo(creature.x, creature.y);
+        ctx.lineTo(creature.x - (creature.vx / speed) * tail, creature.y - (creature.vy / speed) * tail);
+        ctx.stroke();
+      }
+
+      for (const creature of creatures) {
+        const infected = creature.poisonTimer > 0;
+        const pulse = 1 + creature.pulse * 0.72 + Math.sin(game.roundTime * 2.4 + creature.phase) * 0.045;
+        ctx.fillStyle = infected
+          ? `rgba(171, 255, 61, ${lerp(0.32, 0.16, chaos)})`
+          : `rgba(73, 174, 255, ${lerp(0.19, 0.085, chaos)})`;
+        ctx.beginPath();
+        ctx.arc(creature.x, creature.y, creature.radius * 2.55 * pulse, 0, TAU);
+        ctx.fill();
+
+        ctx.fillStyle = infected ? '#c5ff55' : '#9bdcff';
+        ctx.beginPath();
+        ctx.arc(creature.x, creature.y, creature.radius * pulse, 0, TAU);
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255,255,255,0.96)';
+        ctx.beginPath();
+        ctx.arc(creature.x - creature.radius * 0.22, creature.y - creature.radius * 0.25, creature.radius * 0.27, 0, TAU);
+        ctx.fill();
+
+        if (infected) {
+          const progress = clamp(creature.poisonTimer / creature.poisonMax, 0, 1);
+          ctx.strokeStyle = progress < 0.3 ? '#ffea55' : '#b7ff4c';
+          ctx.lineWidth = 1.7;
+          ctx.beginPath();
+          ctx.arc(creature.x, creature.y, creature.radius + 5.5, -Math.PI / 2, -Math.PI / 2 + TAU * progress);
+          ctx.stroke();
+          ctx.fillStyle = '#f4ffd6';
+          ctx.font = '900 8px ui-monospace, SFMono-Regular, Menlo, monospace';
+          ctx.textAlign = 'center';
+          ctx.fillText(String(Math.max(1, Math.ceil(creature.poisonTimer))), creature.x, creature.y - creature.radius - 8);
+        }
+      }
+      ctx.restore();
+    }
+
+    function drawPopups() {
+      ctx.save();
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      for (const popup of popups) {
+        const progress = popup.life / popup.maxLife;
+        const alpha = clamp(progress * 1.8, 0, 1);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = popup.color;
+        ctx.font = `800 ${popup.size}px Inter, ui-sans-serif, system-ui, sans-serif`;
+        ctx.fillText(popup.text, popup.x, popup.y);
+      }
+      ctx.restore();
+
+      if (game.comboTimer > 0 && game.combo >= 4) {
+        const alpha = clamp(game.comboTimer * 1.6, 0, 0.32);
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.strokeStyle = game.combo >= 8 ? '#ffe06d' : '#bdfff0';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(6, 6, width - 12, height - 12);
+        ctx.restore();
+      }
+    }
+
+    function drawFlashes() {
+      if (game.flash > 0) {
+        ctx.fillStyle = `rgba(145, 255, 224, ${game.flash})`;
+        ctx.fillRect(0, 0, width, height);
+      }
+      if (game.dangerFlash > 0) {
+        const gradient = ctx.createRadialGradient(width / 2, height / 2, Math.min(width, height) * 0.24, width / 2, height / 2, Math.max(width, height) * 0.74);
+        gradient.addColorStop(0, 'rgba(255, 41, 66, 0)');
+        gradient.addColorStop(1, `rgba(255, 41, 66, ${game.dangerFlash})`);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+      }
+    }
+
+    function render() {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawBackground();
+      drawFoods();
+      drawBlackHole();
+      drawCore();
+      drawDangers();
+      drawProjectiles();
+      drawParticles();
+      drawCreatures();
+      drawTarget();
+      drawPopups();
+      drawFlashes();
+    }
+
+    function updateHud() {
+      const multiplier = multiplierFor(game.roundTime);
+      const threshold = multiplyThreshold();
+      ui.population.textContent = formatNumber(creatures.length);
+      ui.score.textContent = formatNumber(game.score);
+      ui.multiplier.textContent = `x${multiplier}`;
+      ui.time.textContent = formatTime(game.roundTime);
+      ui.bestPopulation.textContent = formatNumber(records.bestPopulation);
+      ui.ascension.textContent = core.active ? 'CORE' : `${game.ascensionStage} / ${ascensionTotal()}`;
+      ui.growthBar.style.width = `${clamp(game.growth / threshold, 0, 1) * 100}%`;
+      ui.growthText.textContent = creatures.length >= CONFIG.maxPopulation
+        ? 'Maximum swarm reached'
+        : `Grow ${game.growth} / ${threshold}`;
+
+      document.body.dataset.mode = game.mode;
+      document.body.dataset.population = String(creatures.length);
+      document.body.dataset.dangers = String(dangers.length);
+      document.body.dataset.score = String(game.score);
+      document.body.dataset.mutations = Array.from(game.mutations).join(',');
+      document.body.dataset.friendlyFireKills = String(game.friendlyFireKills);
+      document.body.dataset.collateralCharge = String(game.collateralCharge);
+      document.body.dataset.blackHole = blackHole.active ? 'active' : 'closed';
+      document.body.dataset.ascension = String(game.ascensionStage);
+      document.body.dataset.ascensionQuota = String(blackHole.active ? blackHole.quota : currentAscensionQuota());
+      document.body.dataset.coreActive = String(core.active);
+      document.body.dataset.coreHealth = String(core.health);
+      document.body.dataset.coreTime = core.timeLeft.toFixed(1);
+      document.body.dataset.failedAscensions = String(game.failedAscensions);
+      document.body.dataset.endReason = game.endReason;
+      document.body.dataset.grade = game.clearGrade;
+
+      if (core.active) {
+        ui.objectiveTitle.textContent = 'FINAL · THE CORE';
+        ui.objectiveText.textContent = `Enemy fire only · HP ${core.health}/${core.maxHealth} · ${Math.ceil(core.timeLeft)}s`;
+      } else if (game.mode === 'victory') {
+        ui.objectiveTitle.textContent = 'SWARM ASCENDED';
+        ui.objectiveText.textContent = `Grade ${game.clearGrade} · The Core has fallen`;
+      } else if (game.ascensionStage >= ascensionTotal()) {
+        ui.objectiveTitle.textContent = `ASCENSION ${game.ascensionStage} / ${ascensionTotal()}`;
+        ui.objectiveText.textContent = 'Choose the final mutation';
+      } else if (blackHole.active) {
+        ui.objectiveTitle.textContent = `ASCENSION ${game.ascensionStage + 1} / ${ascensionTotal()}`;
+        ui.objectiveText.textContent = `Quota ${blackHole.absorbed}/${blackHole.quota} · ${Math.ceil(blackHole.timeLeft)}s remaining`;
+      } else {
+        ui.objectiveTitle.textContent = `ASCENSION ${game.ascensionStage + 1} / ${ascensionTotal()}`;
+        ui.objectiveText.textContent = `Next quota ${currentAscensionQuota()} · black hole in ${Math.ceil(Math.max(0, blackHole.nextSpawn))}s`;
+      }
+
+      if (game.debug) {
+        const typeCounts = dangers.reduce((counts, danger) => {
+          counts[danger.type] = (counts[danger.type] || 0) + 1;
+          return counts;
+        }, {});
+        const infectedCount = creatures.reduce((count, creature) => count + (creature.poisonTimer > 0 ? 1 : 0), 0);
+        ui.debug.textContent = [
+          `FPS             ${fps.toFixed(0)}`,
+          `Population      ${creatures.length}`,
+          `Food Count      ${foods.length}`,
+          `Danger Count    ${dangers.length}`,
+          `Enemy Types     H${typeCounts.chaser || 0} R${typeCounts.wanderer || 0} L${typeCounts.laser || 0} B${typeCounts.bomber || 0} T${typeCounts.toxic || 0}`,
+          `Projectiles     ${projectiles.length}`,
+          `Infected        ${infectedCount}`,
+          `Black Hole      ${blackHole.active ? `${blackHole.timeLeft.toFixed(1)}s · ${blackHole.absorbed} converted` : `in ${Math.max(0, blackHole.nextSpawn).toFixed(1)}s`}`,
+          `Ascension       ${game.ascensionStage} / ${ascensionTotal()} · failed ${game.failedAscensions}`,
+          `Core            ${core.active ? `${core.health}/${core.maxHealth} · ${core.timeLeft.toFixed(1)}s` : 'inactive'}`,
+          `Mutations       ${game.mutations.size ? Array.from(game.mutations).join(', ') : 'none'}`,
+          `Friendly Fire   ${game.friendlyFireKills}`,
+          `Void Charge     ${Math.round(Math.min(CONFIG.greedCollateralMaxBonus, game.collateralCharge * CONFIG.greedCollateralBonusPerKill) * 100)}%`,
+          `Difficulty      ${difficultyLabel(game.difficulty)} (${game.difficulty.toFixed(2)})`,
+          `Multiplier      x${multiplier}`,
+          `Growth          ${game.growth} / ${threshold}`,
+          `Particles       ${particles.length}`,
+          `Input           ${game.inputMode.toUpperCase()}`
+        ].join('\n');
+      }
+    }
+
+    function frame(now) {
+      const rawDt = Math.max(0, (now - lastFrame) / 1000);
+      const dt = Math.min(rawDt, 0.034);
+      lastFrame = now;
+      if (rawDt > 0) fps = lerp(fps, 1 / rawDt, 0.08);
+      update(dt);
+      render();
+      updateHud();
+      requestAnimationFrame(frame);
+    }
+
+    canvas.addEventListener('pointermove', event => {
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = clamp(event.clientX - rect.left, 0, width);
+      pointer.y = clamp(event.clientY - rect.top, 86, height);
+      pointer.active = true;
+      game.inputMode = 'mouse';
+      game.targetX = pointer.x;
+      game.targetY = pointer.y;
+      if (game.introTimer > 1.5) game.introTimer = 1.5;
+    });
+
+    canvas.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return;
+      const rect = canvas.getBoundingClientRect();
+      pointer.x = clamp(event.clientX - rect.left, 0, width);
+      pointer.y = clamp(event.clientY - rect.top, 86, height);
+      game.inputMode = 'mouse';
+      game.targetX = pointer.x;
+      game.targetY = pointer.y;
+      manualCullAt(pointer.x, pointer.y);
+    });
+
+    window.addEventListener('keydown', event => {
+      const key = event.key.toLowerCase();
+      if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' ', 'w', 'a', 's', 'd'].includes(key)) {
+        event.preventDefault();
+      }
+
+      if ((game.mode === 'gameover' || game.mode === 'victory') && (key === 'r' || key === ' ')) {
+        event.preventDefault();
+        restartGame();
+        return;
+      }
+
+      if (game.mode === 'mutation' && ['1', '2', '3'].includes(key)) {
+        event.preventDefault();
+        const choice = game.mutationChoices[Number(key) - 1];
+        if (choice) selectMutation(choice.id);
+        return;
+      }
+
+      if (event.repeat) {
+        if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) keys.add(key);
+        return;
+      }
+
+      if (key === 'm') {
+        performMultiply(true);
+        return;
+      }
+      if (key === 'k') {
+        cullCreatures();
+        return;
+      }
+
+      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) {
+        if (key === 'd' && dKeyDownAt === 0) dKeyDownAt = performance.now();
+        keys.add(key);
+        game.inputMode = 'keyboard';
+        if (game.introTimer > 1.5) game.introTimer = 1.5;
+      }
+    });
+
+    window.addEventListener('keyup', event => {
+      const key = event.key.toLowerCase();
+      keys.delete(key);
+      if (key === 'd' && dKeyDownAt > 0) {
+        const wasTap = performance.now() - dKeyDownAt < 230;
+        dKeyDownAt = 0;
+        if (wasTap && game.mode === 'playing') {
+          game.debug = !game.debug;
+          ui.debug.classList.toggle('visible', game.debug);
+          ui.debug.setAttribute('aria-hidden', String(!game.debug));
+        }
+      }
+    });
+
+    window.addEventListener('blur', () => {
+      keys.clear();
+      dKeyDownAt = 0;
+    });
+    window.addEventListener('resize', resizeCanvas);
+    ui.restartButton.addEventListener('click', restartGame);
+
+    // Small read-only/testing surface used for local verification; it does not affect play.
+    window.__SWARM__ = Object.freeze({
+      getState: () => ({
+        mode: game.mode,
+        population: creatures.length,
+        foodCount: foods.length,
+        dangerCount: dangers.length,
+        dangerTypes: dangers.reduce((counts, danger) => {
+          counts[danger.type] = (counts[danger.type] || 0) + 1;
+          return counts;
+        }, {}),
+        projectileCount: projectiles.length,
+        infectedCount: creatures.reduce((count, creature) => count + (creature.poisonTimer > 0 ? 1 : 0), 0),
+        roundTime: game.roundTime,
+        score: game.score,
+        multiplier: multiplierFor(game.roundTime),
+        growth: game.growth,
+        threshold: multiplyThreshold(),
+        difficulty: game.difficulty,
+        blackHoleActive: blackHole.active,
+        blackHoleTimeLeft: blackHole.timeLeft,
+        blackHoleAbsorbed: blackHole.absorbed,
+        blackHoleQuota: blackHole.quota,
+        mutations: Array.from(game.mutations),
+        mutationChoices: game.mutationChoices.map(mutation => mutation.id),
+        friendlyFireKills: game.friendlyFireKills,
+        collateralCharge: game.collateralCharge,
+        ascensionStage: game.ascensionStage,
+        failedAscensions: game.failedAscensions,
+        coreActive: core.active,
+        coreHealth: core.health,
+        coreTimeLeft: core.timeLeft,
+        endReason: game.endReason,
+        grade: game.clearGrade,
+        particles: particles.length
+      }),
+      restart: restartGame,
+      multiply: () => performMultiply(true),
+      cull: cullCreatures,
+      openMutationDraft,
+      chooseMutation: selectMutation,
+      spawnDanger: type => createDanger(false, type)
+    });
+
+    resizeCanvas();
+    restartGame();
+    game.introTimer = CONFIG.introDuration;
+    requestAnimationFrame(frame);
+  </script>
+</body>
+</html>
